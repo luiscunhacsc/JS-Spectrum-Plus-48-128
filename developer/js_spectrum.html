@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JS Spectrum Pro + Low Latency Audio</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --panel-color: #1e1e1e;
+            --accent-red: #d00000;
+            --text-color: #e0e0e0;
+            --font-ui: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-ui);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .header h1 {
+            margin: 0 0 20px 0;
+            font-weight: 300; letter-spacing: 6px; font-size: 24px; text-transform: uppercase;
+            background: linear-gradient(90deg, var(--accent-red), #cccc00, #00cc00, #00cccc);
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+            text-shadow: 0 0 10px rgba(255,255,255,0.1);
+        }
+
+        .monitor-frame {
+            position: relative; background: #000; padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 0 0 4px #333, 0 30px 60px rgba(0,0,0,0.8);
+            transition: box-shadow 0.1s;
+        }
+
+        .canvas-wrapper {
+            width: 512px; height: 384px;
+            aspect-ratio: 4 / 3;
+            background: #000; border-radius: 4px; overflow: hidden; outline: none; cursor: pointer;
+        }
+        canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+        
+        .monitor-frame:fullscreen,
+        .monitor-frame:-webkit-full-screen {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            border-radius: 0;
+            box-sizing: border-box;
+            overflow: hidden;
+            display: grid;
+            place-items: center;
+            box-shadow: none;
+            background: #000;
+        }
+        .monitor-frame.is-fullscreen {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            border-radius: 0;
+            box-sizing: border-box;
+            overflow: hidden;
+            display: grid;
+            place-items: center;
+            box-shadow: none;
+            background: #000;
+        }
+        .monitor-frame:fullscreen::backdrop { background: #000; }
+        .monitor-frame:-webkit-full-screen .canvas-wrapper,
+        .monitor-frame:fullscreen .canvas-wrapper {
+            border-radius: 0;
+            margin: 0;
+        }
+        .monitor-frame.is-fullscreen .canvas-wrapper {
+            border-radius: 0;
+            margin: 0;
+        }
+
+        .overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(5px);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s ease; z-index: 10;
+        }
+        .overlay.active { opacity: 1; pointer-events: auto; }
+        .overlay img { max-width: 90%; max-height: 80%; border-radius: 8px; border: 1px solid #444; }
+        .overlay-hint { margin-top: 15px; font-size: 14px; color: #aaa; }
+
+        .controls-wrap {
+            position: relative;
+            margin-top: 24px;
+            width: min(980px, calc(100vw - 28px));
+        }
+        .controls-panel {
+            margin-top: 0;
+            background: linear-gradient(180deg, #1e1e1e 0%, #171717 100%);
+            padding: 12px;
+            border-radius: 16px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: stretch;
+            justify-content: center;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+            border: 1px solid #333;
+        }
+        .control-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            justify-content: center;
+            padding: 8px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid #2f2f2f;
+        }
+        .control-group.core { flex: 1 1 540px; }
+        .control-group.display { flex: 1 1 320px; }
+        .control-group.meta { flex: 0 1 auto; }
+        @media (max-width: 760px) {
+            .controls-wrap { width: min(620px, calc(100vw - 20px)); }
+            .controls-panel { padding: 10px; gap: 8px; }
+            .control-group { width: 100%; justify-content: flex-start; }
+        }
+        .btn {
+            background: #2b2f33;
+            color: #f1f1f1;
+            border: 1px solid #444b52;
+            padding: 9px 16px;
+            border-radius: 11px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-transform: none;
+            letter-spacing: 0.2px;
+            min-height: 38px;
+        }
+        .btn:hover:not(:disabled) { background: #353b41; transform: translateY(-1px); border-color: #59616a; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn.primary { background: linear-gradient(135deg, #9b1f1f, #d00000); border-color: #e44747; color: #fff; }
+        .btn.accent { background: linear-gradient(135deg, #5d4200, #9a6f00); border-color: #d0a03a; color: #fff; }
+        .btn.view { background: linear-gradient(135deg, #004a61, #006f92); border-color: #00a2d1; color: #fff; }
+        .btn.toggle-active { box-shadow: 0 0 0 2px rgba(0, 200, 255, 0.25); border-color: #66d9ff; }
+        .btn.meta { background: #262730; border-color: #4d4f67; }
+        
+        input[type="file"] { display: none; }
+        .samples-menu {
+            position: absolute;
+            top: calc(100% + 12px);
+            left: 50%;
+            width: min(540px, calc(100vw - 28px));
+            transform: translateX(-50%) translateY(-6px);
+            background: linear-gradient(180deg, #111 0%, #171717 100%);
+            border: 1px solid #3a3a3a;
+            border-radius: 14px;
+            box-shadow: 0 14px 28px rgba(0, 0, 0, 0.55);
+            padding: 14px 14px 12px 14px;
+            z-index: 30;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+        .samples-menu.active {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateX(-50%) translateY(0);
+        }
+        .samples-menu-title {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.1px;
+            color: #f2f2f2;
+        }
+        .samples-menu-accent {
+            height: 2px;
+            margin: 8px 0 10px 0;
+            border-radius: 2px;
+            background: linear-gradient(90deg, #d00000, #d7d700, #00d700, #00d7d7);
+        }
+        .samples-label {
+            display: block;
+            margin-bottom: 7px;
+            font-size: 12px;
+            color: #bdbdbd;
+        }
+        .samples-select {
+            width: 100%;
+            border: 1px solid #4a4a4a;
+            border-radius: 8px;
+            background: #0d0d0d;
+            color: #f2f2f2;
+            font-size: 13px;
+            padding: 10px 12px;
+            outline: none;
+        }
+        .samples-select:focus {
+            border-color: #00d7d7;
+            box-shadow: 0 0 0 2px rgba(0, 215, 215, 0.2);
+        }
+        .samples-meta {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .samples-hint {
+            margin: 0;
+            color: #9c9c9c;
+            font-size: 11px;
+            line-height: 1.35;
+        }
+        .samples-close {
+            border: 1px solid #4a4a4a;
+            background: #282828;
+            color: #efefef;
+            border-radius: 999px;
+            padding: 6px 12px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+        .samples-close:hover { background: #343434; }
+        .status-bar { margin-top: 15px; font-family: monospace; font-size: 12px; color: #666; }
+        .shortcut-badge { background: #333; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 11px; border: 1px solid #444; color: #ccc; }
+        .about-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.78);
+            backdrop-filter: blur(4px);
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+        .about-modal.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .about-card {
+            width: min(760px, 100%);
+            max-height: min(86vh, 800px);
+            overflow: auto;
+            border-radius: 14px;
+            border: 1px solid #3a3a3a;
+            background: linear-gradient(180deg, #141414 0%, #0f0f0f 100%);
+            box-shadow: 0 20px 42px rgba(0, 0, 0, 0.65);
+            padding: 18px 20px 16px 20px;
+            line-height: 1.55;
+        }
+        .about-title {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 0.4px;
+            color: #f2f2f2;
+        }
+        .about-accent {
+            height: 2px;
+            margin: 10px 0 12px 0;
+            border-radius: 2px;
+            background: linear-gradient(90deg, #d00000, #d7d700, #00d700, #00d7d7);
+        }
+        .about-card p {
+            margin: 10px 0;
+            color: #d1d1d1;
+            font-size: 14px;
+        }
+        .about-card a {
+            color: #7ee9ff;
+        }
+        .about-card a:hover {
+            color: #b8f4ff;
+        }
+        .about-close {
+            margin-top: 6px;
+            border: 1px solid #4a4a4a;
+            background: #282828;
+            color: #efefef;
+            border-radius: 999px;
+            padding: 8px 14px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.6px;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+        .about-close:hover { background: #343434; }
+    </style>
+
+    <script> var module = {}; </script>
+    <script src="Z80.js"></script>
+    <script>
+        const Z80_CPU = (typeof Z80 === 'function') ? Z80 : (module.exports || window.Z80);
+        if (!Z80_CPU) alert("Critical Error: Z80.js not loaded.");
+    </script>
+</head>
+<body>
+
+    <div class="header"><h1>JS Spectrum</h1></div>
+
+    <div class="monitor-frame" id="monitor">
+        <div class="canvas-wrapper" id="container" tabindex="0">
+            <canvas id="screen" width="256" height="192"></canvas>
+            <div id="keyboardOverlay" class="overlay">
+                <img src="keyboard.jpg" alt="ZX Spectrum Keyboard">
+                <div class="overlay-hint">Press <b>F1</b> to close</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="status-bar"><span id="statusMsg">Choose a Spectrum model to start.</span></div>
+
+    <div class="controls-wrap">
+        <div class="controls-panel">
+            <div class="control-group core">
+                <button class="btn primary" id="btnLoad48" type="button">Start 48K</button>
+                <button class="btn primary" id="btnLoad128" type="button">Start 128K</button>
+                <button class="btn accent" id="btnAudio" type="button" onclick="enableAudio()">Start Audio</button>
+                <label class="btn">Load Tape<input type="file" id="tapFile" disabled accept=".tap,.TAP"></label>
+                <button id="btnSamples" class="btn" type="button" disabled aria-expanded="false">Samples</button>
+                <button id="btnReset" class="btn" type="button" disabled>Reset</button>
+            </div>
+            <div class="control-group display">
+                <button id="btnLargeView" class="btn view" type="button"></button>
+                <button id="btnFullscreen" class="btn view" type="button" onclick="toggleFullscreen()">Fullscreen</button>
+                <button class="btn" type="button" onclick="toggleKeyboard()"><span class="shortcut-badge">F1</span> Keyboard Map</button>
+            </div>
+            <div class="control-group meta">
+                <button id="btnAbout" class="btn meta" type="button">About</button>
+            </div>
+        </div>
+        <details class="rom-manual">
+            <summary>Load custom ROM files</summary>
+            <label class="btn">Choose ROM file(s)<input type="file" id="romFile" multiple accept=".rom,.zip"></label>
+        </details>
+        <div id="samplesMenu" class="samples-menu" aria-hidden="true">
+            <div class="samples-menu-title">Tape Samples</div>
+            <div class="samples-menu-accent"></div>
+            <label class="samples-label" for="sampleSelect">Select a bundled TAP game:</label>
+            <select id="sampleSelect" class="samples-select"></select>
+            <div class="samples-meta">
+                <p class="samples-hint">After selecting, type <b>LOAD ""</b> and press Enter on the Spectrum prompt.</p>
+                <button id="btnSamplesClose" class="samples-close" type="button">Close</button>
+            </div>
+        </div>
+    </div>
+    
+    <div style="margin-top:15px; font-size: 12px; color: #555;">
+        PC <b>Ctrl</b> = Caps Shift &nbsp;|&nbsp; PC <b>Shift</b> = Symbol Shift &nbsp;|&nbsp; <b>Arrow keys</b> = Spectrum cursor keys
+    </div>
+    <div id="aboutModal" class="about-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
+        <div class="about-card">
+            <h2 id="aboutTitle" class="about-title">About This Emulator</h2>
+            <div class="about-accent"></div>
+            <p><b>Author:</b> Luis Cunha, 2026.</p>
+            <p>This project is distributed under the <b>MIT License</b>.</p>
+            <p><b>Z80 microprocessor emulator core (`Z80.js`):</b> Copyright (c) <b>Molly Howell</b>.</p>
+            <p>
+                This emulator is dedicated to <b>Pedro Gimeno</b>, who first showed me the Turing machine principle in action on the day I saw
+                a fully functional ZX Spectrum replica on my PC-AT display. The 286 could only run it at about 50% speed, but it felt magical.
+                Pioneers like Pedro are often not recognized enough, and I want to openly manifest my respect and gratitude for his work.
+            </p>
+            <p>
+                For those who want to know more:
+                <a href="https://www.youtube.com/watch?v=zzWyqmLdeS8" target="_blank" rel="noopener noreferrer">
+                    https://www.youtube.com/watch?v=zzWyqmLdeS8
+                </a>
+            </p>
+            <button id="btnAboutClose" class="about-close" type="button">Close</button>
+        </div>
+    </div>
+
+<script>
+/**
+ * JS SPECTRUM PRO - LOW LATENCY AUDIO
+ * Fix: Synced visual loop to Audio Time to prevent buffering drift (Speedup).
+ */
+
+const MEM_SIZE = 65536;
+const ROM_SIZE = 0x4000;
+const RAM_BANK_COUNT = 8;
+const PALETTE_INT = [0xFF000000, 0xFFD70000, 0xFF0000D7, 0xFFD700D7, 0xFF00D700, 0xFFD7D700, 0xFF00D7D7, 0xFFD7D7D7, 0xFF000000, 0xFFFF0000, 0xFF0000FF, 0xFFFF00FF, 0xFF00FF00, 0xFFFFFF00, 0xFF00FFFF, 0xFFFFFFFF];
+const PALETTE_HEX = ['#000000', '#0000D7', '#D70000', '#D700D7', '#00D700', '#00D7D7', '#D7D700', '#D7D7D7', '#000000', '#0000FF', '#FF0000', '#FF00FF', '#00FF00', '#00FFFF', '#FFFF00', '#FFFFFF'];
+
+const memory = new Uint8Array(MEM_SIZE);
+const ramBanks = Array.from({ length: RAM_BANK_COUNT }, () => new Uint8Array(ROM_SIZE));
+const EMBEDDED_ROM_BASE64 = {};
+let romBanks = [];
+let machineModel = '48K';
+let pagingLatch = 0;
+let pagingLocked = false;
+let z80 = null;
+let isRunning = false;
+let tapeBuffer = null;
+let tapeIndex = 0;
+let animationFrameId;
+const TAP_ONLY_MSG = 'Only TAP files are supported for now.';
+const DEFAULT_SAMPLE_TAPS = [
+    { name: 'GALAXINS.TAP', path: 'TAPs/GALAXINS.TAP' },
+    { name: 'Night Sky, The (1983)(Bridge Software).tap', path: 'TAPs/Night Sky, The (1983)(Bridge Software).tap' },
+    { name: 'tetris_release.tap', path: 'TAPs/tetris_release.tap' }
+];
+const EMBEDDED_TAP_BASE64 = {};
+
+// --- AUDIO SYSTEM ---
+let audioCtx = null;
+let audioGain = null;
+let nextAudioTime = 0;
+const AUDIO_SAMPLE_RATE = 44100;
+const T_STATES_PER_FRAME = 70000;
+let speakerLog = []; 
+let lastSpeakerState = 0;
+
+function enableAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: AUDIO_SAMPLE_RATE });
+        audioGain = audioCtx.createGain();
+        audioGain.gain.value = 0.10; // Lower volume for comfort
+        audioGain.connect(audioCtx.destination);
+        nextAudioTime = audioCtx.currentTime;
+        const audioBtn = document.getElementById('btnAudio');
+        audioBtn.disabled = true;
+        audioBtn.textContent = 'Audio Enabled';
+        log("Audio Enabled. Ready.", 'success');
+    } else if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+}
+
+function processAudioFrame(log) {
+    if (!audioCtx) return;
+
+    // Buffer size = 1 frame @ 50Hz = 0.02s
+    const sampleCount = Math.floor(AUDIO_SAMPLE_RATE / 50); 
+    const buffer = audioCtx.createBuffer(1, sampleCount, AUDIO_SAMPLE_RATE);
+    const data = buffer.getChannelData(0);
+
+    let logIdx = 0;
+    let currentSpeaker = lastSpeakerState;
+
+    for (let i = 0; i < sampleCount; i++) {
+        const currentT = (i / sampleCount) * T_STATES_PER_FRAME;
+        while (logIdx < log.length && log[logIdx].t <= currentT) {
+            currentSpeaker = log[logIdx].val;
+            logIdx++;
+        }
+        data[i] = currentSpeaker ? 0.5 : -0.5;
+    }
+    lastSpeakerState = currentSpeaker;
+
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioGain);
+
+    // Tight Sync: If we fell behind, jump to now. 
+    if (nextAudioTime < audioCtx.currentTime) nextAudioTime = audioCtx.currentTime;
+    
+    source.start(nextAudioTime);
+    nextAudioTime += buffer.duration;
+}
+
+// --- EMULATOR CORE ---
+
+const keyboard = { 0xFEFE: 0x1F, 0xFDFE: 0x1F, 0xFBFE: 0x1F, 0xF7FE: 0x1F, 0xEFFE: 0x1F, 0xDFFE: 0x1F, 0xBFFE: 0x1F, 0x7FFE: 0x1F };
+const SCREEN_WIDTH = 256;
+const SCREEN_HEIGHT = 192;
+const DEFAULT_SCREEN_SCALE = 2;
+const WINDOWED_WIDTH_MARGIN = 60;
+const WINDOWED_HEIGHT_MARGIN = 320;
+const canvas = document.getElementById('screen');
+const ctx = canvas.getContext('2d');
+const imgData = ctx.createImageData(SCREEN_WIDTH, SCREEN_HEIGHT);
+const pixels = new Uint32Array(imgData.data.buffer);
+const monitor = document.getElementById('monitor');
+const container = document.getElementById('container');
+const btnLargeView = document.getElementById('btnLargeView');
+const btnFullscreen = document.getElementById('btnFullscreen');
+const btnSamples = document.getElementById('btnSamples');
+const samplesMenu = document.getElementById('samplesMenu');
+const sampleSelect = document.getElementById('sampleSelect');
+const btnSamplesClose = document.getElementById('btnSamplesClose');
+const btnAbout = document.getElementById('btnAbout');
+const aboutModal = document.getElementById('aboutModal');
+const btnAboutClose = document.getElementById('btnAboutClose');
+let sampleCatalog = [];
+let displayMode = 'default';
+
+function getFullscreenElement() {
+    return document.fullscreenElement || document.webkitFullscreenElement;
+}
+
+function setDisplayScale(scale) {
+    container.style.width = `${SCREEN_WIDTH * scale}px`;
+    container.style.height = `${SCREEN_HEIGHT * scale}px`;
+}
+
+function getMaxWindowedScale() {
+    const targetWidth = Math.max(SCREEN_WIDTH, (window.innerWidth || SCREEN_WIDTH) - WINDOWED_WIDTH_MARGIN);
+    const targetHeight = Math.max(SCREEN_HEIGHT, (window.innerHeight || SCREEN_HEIGHT) - WINDOWED_HEIGHT_MARGIN);
+    const maxScale = Math.floor(Math.min(targetWidth / SCREEN_WIDTH, targetHeight / SCREEN_HEIGHT));
+    return Math.max(1, maxScale);
+}
+
+function getLargeWindowedScale() {
+    const maxScale = getMaxWindowedScale();
+    if (maxScale <= DEFAULT_SCREEN_SCALE) return DEFAULT_SCREEN_SCALE;
+    const midpointScale = Math.floor((DEFAULT_SCREEN_SCALE + maxScale) / 2);
+    return Math.max(DEFAULT_SCREEN_SCALE + 1, midpointScale);
+}
+
+function updateLargeViewButton() {
+    const isLargeMode = displayMode === 'large';
+    btnLargeView.classList.toggle('toggle-active', isLargeMode);
+    btnLargeView.innerHTML = `<span class="shortcut-badge">F3</span> ${isLargeMode ? 'Normal View' : 'Large View'}`;
+}
+
+function updateLargeViewButtonState(isFullscreenActive) {
+    if (isFullscreenActive) {
+        btnLargeView.disabled = true;
+        btnLargeView.classList.remove('toggle-active');
+        btnLargeView.innerHTML = '<span class="shortcut-badge">F3</span> Large View';
+        return;
+    }
+
+    btnLargeView.disabled = false;
+    updateLargeViewButton();
+}
+
+function toggleLargeView() {
+    if (getFullscreenElement() === monitor) return;
+    displayMode = (displayMode === 'large') ? 'default' : 'large';
+    updateLargeViewButton();
+    syncDisplayScale();
+    container.focus();
+}
+
+function syncDisplayScale() {
+    if (getFullscreenElement() === monitor) {
+        const targetWidth = monitor.clientWidth || window.innerWidth;
+        const targetHeight = monitor.clientHeight || window.innerHeight;
+        const maxScale = Math.floor(Math.min(targetWidth / SCREEN_WIDTH, targetHeight / SCREEN_HEIGHT));
+        setDisplayScale(Math.max(1, maxScale));
+    } else {
+        const nextScale = (displayMode === 'large') ? getLargeWindowedScale() : DEFAULT_SCREEN_SCALE;
+        setDisplayScale(nextScale);
+    }
+}
+
+async function toggleFullscreen() {
+    try {
+        if (getFullscreenElement() === monitor) {
+            if (document.exitFullscreen) await document.exitFullscreen();
+            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        } else {
+            if (monitor.requestFullscreen) await monitor.requestFullscreen();
+            else if (monitor.webkitRequestFullscreen) monitor.webkitRequestFullscreen();
+        }
+    } catch (err) {
+        log(`Fullscreen failed: ${err.message}`, 'error');
+    }
+}
+
+function toggleKeyboard() {
+    const overlay = document.getElementById('keyboardOverlay');
+    overlay.classList.toggle('active');
+    if (!overlay.classList.contains('active')) container.focus();
+}
+
+function openAbout() {
+    aboutModal.classList.add('active');
+    aboutModal.setAttribute('aria-hidden', 'false');
+}
+
+function closeAbout() {
+    aboutModal.classList.remove('active');
+    aboutModal.setAttribute('aria-hidden', 'true');
+    container.focus();
+}
+
+function log(msg, type) {
+    const el = document.getElementById('statusMsg');
+    el.innerText = msg;
+    el.style.color = type === 'error' ? '#ff4444' : (type === 'success' ? '#00cc00' : '#888');
+}
+
+function getRamBankForAddress(addr) {
+    if (addr < 0x8000) return 5;
+    if (addr < 0xC000) return 2;
+    return pagingLatch & 7;
+}
+
+function readMemory(addr) {
+    if (machineModel !== '128K') return memory[addr];
+    if (addr < 0x4000) return romBanks[(pagingLatch >> 4) & 1][addr];
+    const bank = addr < 0x8000 ? 5 : (addr < 0xC000 ? 2 : (pagingLatch & 7));
+    return ramBanks[bank][addr & 0x3FFF];
+}
+
+function writeMemory(addr, value) {
+    if (machineModel !== '128K') {
+        if (addr >= 0x4000) memory[addr] = value;
+        return;
+    }
+    if (addr >= 0x4000) {
+        const bank = getRamBankForAddress(addr);
+        ramBanks[bank][addr & 0x3FFF] = value;
+    }
+}
+
+function page128KMemory(value) {
+    if (pagingLocked) return;
+    pagingLatch = value & 0x3F;
+    pagingLocked = (pagingLatch & 0x20) !== 0;
+}
+
+function readKeyboardPort(port) {
+    if (port & 0x0001) return 0xFF;
+
+    const rowSelect = (port >> 8) & 0xFF;
+    let result = 0x1F;
+    for (const rowAddress in keyboard) {
+        const row = (parseInt(rowAddress, 10) >> 8) & 0xFF;
+        if ((rowSelect & (~row & 0xFF)) === 0) result &= keyboard[rowAddress];
+    }
+    return result | 0xA0;
+}
+
+async function extractRomFilesFromZip(file) {
+    const archive = new Uint8Array(await file.arrayBuffer());
+    const view = new DataView(archive.buffer, archive.byteOffset, archive.byteLength);
+    let eocdOffset = -1;
+    const searchStart = Math.max(0, archive.length - 0x10016);
+    for (let offset = archive.length - 22; offset >= searchStart; offset--) {
+        if (view.getUint32(offset, true) === 0x06054B50) {
+            eocdOffset = offset;
+            break;
+        }
+    }
+    if (eocdOffset < 0) throw new Error(`${file.name} is not a valid ZIP archive.`);
+
+    const entryCount = view.getUint16(eocdOffset + 10, true);
+    let entryOffset = view.getUint32(eocdOffset + 16, true);
+    const romFiles = [];
+    for (let entry = 0; entry < entryCount; entry++) {
+        if (view.getUint32(entryOffset, true) !== 0x02014B50) {
+            throw new Error(`${file.name} contains an invalid ZIP directory.`);
+        }
+        const method = view.getUint16(entryOffset + 10, true);
+        const compressedSize = view.getUint32(entryOffset + 20, true);
+        const uncompressedSize = view.getUint32(entryOffset + 24, true);
+        const nameLength = view.getUint16(entryOffset + 28, true);
+        const extraLength = view.getUint16(entryOffset + 30, true);
+        const commentLength = view.getUint16(entryOffset + 32, true);
+        const localHeaderOffset = view.getUint32(entryOffset + 42, true);
+        const name = new TextDecoder().decode(archive.subarray(entryOffset + 46, entryOffset + 46 + nameLength));
+        entryOffset += 46 + nameLength + extraLength + commentLength;
+        if (!/\.rom$/i.test(name)) continue;
+
+        if (view.getUint32(localHeaderOffset, true) !== 0x04034B50) {
+            throw new Error(`${name} has an invalid ZIP entry header.`);
+        }
+        const localNameLength = view.getUint16(localHeaderOffset + 26, true);
+        const localExtraLength = view.getUint16(localHeaderOffset + 28, true);
+        const dataOffset = localHeaderOffset + 30 + localNameLength + localExtraLength;
+        const compressed = archive.subarray(dataOffset, dataOffset + compressedSize);
+        let bytes;
+        if (method === 0) {
+            bytes = compressed.slice();
+        } else if (method === 8 && typeof DecompressionStream !== 'undefined') {
+            const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+            bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+        } else if (method === 8) {
+            throw new Error('This browser cannot decompress ROM ZIP files. Extract the ROMs and select the .rom files.');
+        } else {
+            throw new Error(`${name} uses an unsupported ZIP compression method.`);
+        }
+        if (bytes.length !== uncompressedSize) throw new Error(`${name} has an invalid uncompressed size.`);
+        romFiles.push({ name, bytes });
+    }
+    if (!romFiles.length) throw new Error(`${file.name} does not contain a .rom file.`);
+    return romFiles;
+}
+
+async function readRomFiles(files) {
+    const romFiles = [];
+    for (const file of [...files].sort((a, b) => a.name.localeCompare(b.name))) {
+        if (/\.zip$/i.test(file.name)) {
+            romFiles.push(...await extractRomFilesFromZip(file));
+        } else {
+            romFiles.push({ name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) });
+        }
+    }
+    romFiles.sort((a, b) => a.name.localeCompare(b.name));
+    if (romFiles.some((rom) => rom.bytes.length !== ROM_SIZE)) {
+        throw new Error('Each selected ROM must be exactly 16 KB.');
+    }
+    if (romFiles.length !== 1 && romFiles.length !== 2) {
+        throw new Error('Select one 16 KB ROM for 48K mode, or both 128K ROMs.');
+    }
+    return romFiles;
+}
+
+function loadRomSet(romFiles) {
+    memory.fill(0);
+    ramBanks.forEach((bank) => bank.fill(0));
+    pagingLatch = 0;
+    pagingLocked = false;
+
+    if (romFiles.length === 2) {
+        machineModel = '128K';
+        romBanks = romFiles.map((rom) => rom.bytes);
+    } else {
+        machineModel = '48K';
+        romBanks = [];
+        memory.set(romFiles[0].bytes, 0);
+    }
+}
+
+async function fetchRomFile(path) {
+    const response = await fetch(path);
+    if (!response.ok) throw new Error(`Could not load ${path} (HTTP ${response.status}).`);
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    return { name: path.split('/').pop(), bytes };
+}
+
+async function loadBuiltInModel(model) {
+    const buttons = [document.getElementById('btnLoad48'), document.getElementById('btnLoad128')];
+    buttons.forEach((button) => { button.disabled = true; });
+    isRunning = false;
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    log(`Loading ${model} ROM${model === '128K' ? 's' : ''}...`, 'normal');
+
+    try {
+        let romFiles;
+        if (model === '48K') {
+            const bytes = EMBEDDED_ROM_BASE64['48K']
+                ? decodeBase64ToBytes(EMBEDDED_ROM_BASE64['48K'])
+                : (await fetchRomFile('48.rom')).bytes;
+            romFiles = [{ name: '48.rom', bytes }];
+        } else if (EMBEDDED_ROM_BASE64['128-0.rom'] && EMBEDDED_ROM_BASE64['128-1.rom']) {
+            romFiles = ['128-0.rom', '128-1.rom'].map((name) => ({
+                name,
+                bytes: decodeBase64ToBytes(EMBEDDED_ROM_BASE64[name])
+            }));
+        } else {
+            const archivePaths = ['ZX%20Spectrum%20128/128-0.rom.zip', 'ZX%20Spectrum%20128/128-1.rom.zip'];
+            const archives = await Promise.all(archivePaths.map(async (path) => {
+                if (EMBEDDED_ROM_BASE64[path]) {
+                    const bytes = decodeBase64ToBytes(EMBEDDED_ROM_BASE64[path]);
+                    return { name: path.split('/').pop(), arrayBuffer: async () => bytes.buffer };
+                }
+                const response = await fetch(path);
+                if (!response.ok) throw new Error(`Could not load ${path} (HTTP ${response.status}).`);
+                const bytes = await response.arrayBuffer();
+                return { name: path.split('/').pop(), arrayBuffer: async () => bytes };
+            }));
+            romFiles = await readRomFiles(archives);
+        }
+
+        if (romFiles.some((rom) => rom.bytes.length !== ROM_SIZE)) {
+            throw new Error('Each ROM must be exactly 16 KB.');
+        }
+        if ((model === '128K') !== (romFiles.length === 2)) {
+            throw new Error(`The supplied ${model} ROM set is incomplete.`);
+        }
+        loadRomSet(romFiles);
+        initZ80();
+    } catch (err) {
+        log(`Could not start ${model}: ${err.message}`, 'error');
+    } finally {
+        buttons.forEach((button) => { button.disabled = false; });
+    }
+}
+
+function decodeBase64ToBytes(base64) {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+}
+
+function isTapFileName(fileName) {
+    return /\.tap$/i.test(fileName || '');
+}
+
+function setTapeBuffer(arrayBuffer, sourceLabel = 'Tape') {
+    tapeBuffer = arrayBuffer;
+    tapeIndex = 0;
+    log(`${sourceLabel} loaded. Type LOAD "" and press Enter.`, 'success');
+}
+
+function getSampleCatalog() {
+    const embeddedPaths = Object.keys(EMBEDDED_TAP_BASE64);
+    if (embeddedPaths.length > 0) {
+        return embeddedPaths
+            .sort((a, b) => a.localeCompare(b))
+            .map((path) => ({ name: path.split('/').pop(), path }));
+    }
+    return DEFAULT_SAMPLE_TAPS;
+}
+
+function encodeSamplePath(path) {
+    return path.split('/').map(encodeURIComponent).join('/');
+}
+
+async function loadSampleTap(sample) {
+    try {
+        if (EMBEDDED_TAP_BASE64[sample.path]) {
+            const bytes = decodeBase64ToBytes(EMBEDDED_TAP_BASE64[sample.path]);
+            setTapeBuffer(bytes.buffer, `Sample "${sample.name}"`);
+            return true;
+        }
+
+        const response = await fetch(encodeSamplePath(sample.path));
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        setTapeBuffer(await response.arrayBuffer(), `Sample "${sample.name}"`);
+        return true;
+    } catch (err) {
+        log(`Failed to load sample: ${err.message}`, 'error');
+        return false;
+    }
+}
+
+function renderSamplesMenu() {
+    sampleCatalog = getSampleCatalog();
+    sampleSelect.innerHTML = '';
+
+    if (!sampleCatalog.length) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'No TAP samples found';
+        sampleSelect.appendChild(option);
+        sampleSelect.disabled = true;
+        log('No sample TAP files available.', 'error');
+        return;
+    }
+
+    const placeholderOption = document.createElement('option');
+    placeholderOption.value = '';
+    placeholderOption.textContent = 'Choose a sample...';
+    sampleSelect.appendChild(placeholderOption);
+
+    for (const sample of sampleCatalog) {
+        const option = document.createElement('option');
+        option.value = sample.path;
+        option.textContent = sample.name;
+        sampleSelect.appendChild(option);
+    }
+
+    sampleSelect.value = '';
+    sampleSelect.disabled = false;
+}
+
+function openSamplesMenu() {
+    renderSamplesMenu();
+    samplesMenu.classList.add('active');
+    samplesMenu.setAttribute('aria-hidden', 'false');
+    btnSamples.setAttribute('aria-expanded', 'true');
+    sampleSelect.focus();
+}
+
+function closeSamplesMenu() {
+    samplesMenu.classList.remove('active');
+    samplesMenu.setAttribute('aria-hidden', 'true');
+    btnSamples.setAttribute('aria-expanded', 'false');
+}
+
+function toggleSamplesMenu() {
+    if (samplesMenu.classList.contains('active')) {
+        closeSamplesMenu();
+    } else {
+        openSamplesMenu();
+    }
+}
+
+async function handleSampleSelection() {
+    const selectedPath = sampleSelect.value;
+    if (!selectedPath) return;
+
+    const selectedSample = sampleCatalog.find((sample) => sample.path === selectedPath);
+    if (!selectedSample) {
+        log('Invalid sample selection.', 'error');
+        return;
+    }
+
+    const loaded = await loadSampleTap(selectedSample);
+    if (loaded) {
+        closeSamplesMenu();
+        container.focus();
+    }
+}
+
+function initZ80() {
+    z80 = new Z80_CPU({
+        mem_read: readMemory,
+        mem_write: writeMemory,
+        io_read: readKeyboardPort,
+        io_write: (port, val) => {
+            if (machineModel === '128K' && (port & 0xC002) === 0x4000 && (port & 0x00FF) === 0x00FD) {
+                page128KMemory(val);
+            }
+            if ((port & 0x1) === 0) {
+                const speaker = (val & 0x10) ? 1 : 0;
+                speakerLog.push({ t: frameTStates, val: speaker });
+                const colorIdx = val & 7;
+                monitor.style.boxShadow = `0 0 0 4px ${PALETTE_HEX[colorIdx]}, 0 30px 60px rgba(0,0,0,0.8)`;
+            }
+        }
+    });
+
+    log(`${machineModel} ROM${machineModel === '128K' ? 's' : ''} loaded.`, 'success');
+    document.getElementById('btnReset').disabled = false;
+    document.getElementById('tapFile').disabled = false;
+    document.getElementById('btnSamples').disabled = false;
+    resetSystem();
+}
+
+function resetSystem() {
+    if(!z80) return;
+    z80.reset();
+    tapeIndex = 0;
+    pagingLatch = 0;
+    pagingLocked = false;
+    isRunning = true;
+    if(animationFrameId) cancelAnimationFrame(animationFrameId);
+    container.focus();
+    monitor.style.boxShadow = `0 0 0 4px #333, 0 30px 60px rgba(0,0,0,0.8)`;
+    loop();
+    log("Reset. Type LOAD \"\" and press Enter.", 'normal');
+}
+
+let frameTStates = 0; 
+
+function loop() {
+    if (!isRunning) return;
+
+    // --- AUDIO SYNC LOCK ---
+    // If we have audio enabled, we MUST NOT run faster than the audio hardware.
+    // If the next audio chunk is scheduled > 40ms in the future, we are running too fast.
+    // We skip this visual frame to let the audio "catch up".
+    if (audioCtx && (nextAudioTime - audioCtx.currentTime) > 0.04) {
+        animationFrameId = requestAnimationFrame(loop);
+        return;
+    }
+
+    frameTStates = 0; 
+    speakerLog = [];  
+
+    while (frameTStates < T_STATES_PER_FRAME) {
+        if (z80.getState().pc === 0x0556 && tapeBuffer && (machineModel === '48K' || ((pagingLatch >> 4) & 1) === 1)) {
+            handleTapeLoad();
+            continue; 
+        }
+        frameTStates += z80.run_instruction();
+    }
+    
+    z80.interrupt(false, 0);
+    renderScreen();
+    processAudioFrame(speakerLog);
+
+    animationFrameId = requestAnimationFrame(loop);
+}
+
+function handleTapeLoad() {
+    let state = z80.getState();
+    let currentTapePos = tapeIndex;
+
+    if (!tapeBuffer || currentTapePos >= tapeBuffer.byteLength) {
+        log("Tape End.", 'error');
+        returnFromTrap(state, false);
+        return;
+    }
+
+    const view = new DataView(tapeBuffer);
+    if (currentTapePos + 2 > tapeBuffer.byteLength) { returnFromTrap(state, false); return; }
+    const blockLen = view.getUint16(currentTapePos, true);
+    if (currentTapePos + 2 + blockLen > tapeBuffer.byteLength) { returnFromTrap(state, false); return; }
+
+    const flagByte = view.getUint8(currentTapePos + 2);
+    let dataPtr = currentTapePos + 3;
+    let payloadLen = blockLen - 2;
+    if (payloadLen < 0) payloadLen = 0;
+
+    let destAddr = state.ix;
+    let reqLen = (state.d << 8) | state.e; // Fix undefined DE
+    
+    const bytesToCopy = (payloadLen < reqLen) ? payloadLen : reqLen;
+    for (let i = 0; i < bytesToCopy; i++) {
+        writeMemory((destAddr + i) & 0xFFFF, view.getUint8(dataPtr + i));
+    }
+    
+    state.ix += bytesToCopy;
+    let newDE = reqLen - bytesToCopy;
+    if(newDE < 0) newDE = 0;
+    state.d = (newDE >> 8) & 0xFF;
+    state.e = newDE & 0xFF;
+    state.a = flagByte; 
+
+    tapeIndex += blockLen + 2;
+
+    returnFromTrap(state, true);
+    log("Block Loaded.", 'success');
+}
+
+function returnFromTrap(state, success) {
+    let retAddr = readMemory(state.sp) | (readMemory((state.sp + 1) & 0xFFFF) << 8);
+    state.sp = (state.sp + 2) & 0xFFFF;
+    state.pc = retAddr;
+
+    if (success) {
+        if(state.flags) { state.flags.C = 1; }
+        if(state.f !== undefined) { state.f |= 1; }
+    } else {
+        if(state.flags) { state.flags.C = 0; }
+        if(state.f !== undefined) { state.f &= ~1; }
+    }
+
+    z80.setState(state);
+}
+
+function renderScreen() {
+    const screenBank = machineModel === '128K' && (pagingLatch & 0x08) ? 7 : 5;
+    for (let y = 0; y < 192; y++) {
+        const vAddr = 0x4000 | ((y & 0xC0) << 5) | ((y & 0x38) << 2) | ((y & 0x07) << 8);
+        const aAddr = 0x5800 | ((y >> 3) << 5);
+        for (let xByte = 0; xByte < 32; xByte++) {
+            const pixelByte = machineModel === '128K'
+                ? ramBanks[screenBank][vAddr + xByte - 0x4000]
+                : memory[vAddr + xByte];
+            const attrByte = machineModel === '128K'
+                ? ramBanks[screenBank][aAddr + xByte - 0x4000]
+                : memory[aAddr + xByte];
+            const ink = (attrByte & 7) + ((attrByte & 64) >> 3);
+            const paper = ((attrByte & 56) >> 3) + ((attrByte & 64) >> 3);
+            const flash = (attrByte & 128) && (Math.floor(Date.now() / 320) % 2 === 0);
+            const c0 = PALETTE_INT[flash ? ink : paper];
+            const c1 = PALETTE_INT[flash ? paper : ink];
+            for (let bit = 0; bit < 8; bit++) {
+                pixels[(y * 256) + (xByte * 8) + bit] = (pixelByte & (128 >> bit)) ? c1 : c0;
+            }
+        }
+    }
+    ctx.putImageData(imgData, 0, 0);
+}
+
+const keyMapByCode = {
+    ControlLeft: [0xFEFE, 0x01], ControlRight: [0xFEFE, 0x01],
+    ShiftLeft: [0x7FFE, 0x02], ShiftRight: [0x7FFE, 0x02],
+    KeyZ: [0xFEFE, 0x02], KeyX: [0xFEFE, 0x04], KeyC: [0xFEFE, 0x08], KeyV: [0xFEFE, 0x10],
+    KeyA: [0xFDFE, 0x01], KeyS: [0xFDFE, 0x02], KeyD: [0xFDFE, 0x04], KeyF: [0xFDFE, 0x08], KeyG: [0xFDFE, 0x10],
+    KeyQ: [0xFBFE, 0x01], KeyW: [0xFBFE, 0x02], KeyE: [0xFBFE, 0x04], KeyR: [0xFBFE, 0x08], KeyT: [0xFBFE, 0x10],
+    Digit1: [0xF7FE, 0x01], Digit2: [0xF7FE, 0x02], Digit3: [0xF7FE, 0x04], Digit4: [0xF7FE, 0x08], Digit5: [0xF7FE, 0x10],
+    Digit0: [0xEFFE, 0x01], Digit9: [0xEFFE, 0x02], Digit8: [0xEFFE, 0x04], Digit7: [0xEFFE, 0x08], Digit6: [0xEFFE, 0x10],
+    KeyP: [0xDFFE, 0x01], KeyO: [0xDFFE, 0x02], KeyI: [0xDFFE, 0x04], KeyU: [0xDFFE, 0x08], KeyY: [0xDFFE, 0x10],
+    Enter: [0xBFFE, 0x01], NumpadEnter: [0xBFFE, 0x01], KeyL: [0xBFFE, 0x02], KeyK: [0xBFFE, 0x04], KeyJ: [0xBFFE, 0x08], KeyH: [0xBFFE, 0x10],
+    Space: [0x7FFE, 0x01], KeyM: [0x7FFE, 0x04], KeyN: [0x7FFE, 0x08], KeyB: [0x7FFE, 0x10]
+};
+
+const cursorKeyMapByCode = {
+    ArrowLeft: [0xF7FE, 0x10],
+    ArrowDown: [0xEFFE, 0x10],
+    ArrowUp: [0xEFFE, 0x08],
+    ArrowRight: [0xEFFE, 0x04]
+};
+const cursorKeyMapByKey = {
+    ArrowLeft: cursorKeyMapByCode.ArrowLeft,
+    ArrowDown: cursorKeyMapByCode.ArrowDown,
+    ArrowUp: cursorKeyMapByCode.ArrowUp,
+    ArrowRight: cursorKeyMapByCode.ArrowRight
+};
+const cursorKeysPressed = new Set();
+
+// Fallback for environments where KeyboardEvent.code is unavailable.
+const keyMapByKey = {
+    'Control': [0xFEFE, 0x01], 'Shift': [0x7FFE, 0x02],
+    'z': [0xFEFE, 0x02], 'x': [0xFEFE, 0x04], 'c': [0xFEFE, 0x08], 'v': [0xFEFE, 0x10],
+    'a': [0xFDFE, 0x01], 's': [0xFDFE, 0x02], 'd': [0xFDFE, 0x04], 'f': [0xFDFE, 0x08], 'g': [0xFDFE, 0x10],
+    'q': [0xFBFE, 0x01], 'w': [0xFBFE, 0x02], 'e': [0xFBFE, 0x04], 'r': [0xFBFE, 0x08], 't': [0xFBFE, 0x10],
+    '1': [0xF7FE, 0x01], '2': [0xF7FE, 0x02], '3': [0xF7FE, 0x04], '4': [0xF7FE, 0x08], '5': [0xF7FE, 0x10],
+    '0': [0xEFFE, 0x01], '9': [0xEFFE, 0x02], '8': [0xEFFE, 0x04], '7': [0xEFFE, 0x08], '6': [0xEFFE, 0x10],
+    'p': [0xDFFE, 0x01], 'o': [0xDFFE, 0x02], 'i': [0xDFFE, 0x04], 'u': [0xDFFE, 0x08], 'y': [0xDFFE, 0x10],
+    'Enter': [0xBFFE, 0x01], 'l': [0xBFFE, 0x02], 'k': [0xBFFE, 0x04], 'j': [0xBFFE, 0x08], 'h': [0xBFFE, 0x10],
+    ' ': [0x7FFE, 0x01], 'm': [0x7FFE, 0x04], 'n': [0x7FFE, 0x08], 'b': [0x7FFE, 0x10]
+};
+
+function resolveSpectrumKey(e) {
+    if (e.code && keyMapByCode[e.code]) return keyMapByCode[e.code];
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    return keyMapByKey[k];
+}
+
+function resolveSpectrumCursorKey(e) {
+    if (e.code && cursorKeyMapByCode[e.code]) return cursorKeyMapByCode[e.code];
+    return cursorKeyMapByKey[e.key];
+}
+
+function releaseAllKeys() {
+    cursorKeysPressed.clear();
+    keyboard[0xFEFE] = 0x1F;
+    keyboard[0xFDFE] = 0x1F;
+    keyboard[0xFBFE] = 0x1F;
+    keyboard[0xF7FE] = 0x1F;
+    keyboard[0xEFFE] = 0x1F;
+    keyboard[0xDFFE] = 0x1F;
+    keyboard[0xBFFE] = 0x1F;
+    keyboard[0x7FFE] = 0x1F;
+}
+
+window.addEventListener('keydown', (e) => {
+    if (samplesMenu.classList.contains('active') || aboutModal.classList.contains('active')) return;
+    if (e.key === 'F1') { e.preventDefault(); toggleKeyboard(); return; }
+    if (e.key === 'F2') { e.preventDefault(); toggleFullscreen(); return; }
+    if (e.key === 'F3') { e.preventDefault(); toggleLargeView(); return; }
+    const cursorKey = resolveSpectrumCursorKey(e);
+    if (cursorKey) {
+        cursorKeysPressed.add(e.code || e.key);
+        keyboard[0xFEFE] &= ~0x01;
+        keyboard[cursorKey[0]] &= ~cursorKey[1];
+        e.preventDefault();
+        return;
+    }
+    let k = resolveSpectrumKey(e);
+    if (k) { keyboard[k[0]] &= ~k[1]; e.preventDefault(); }
+});
+window.addEventListener('keyup', (e) => {
+    const cursorKey = resolveSpectrumCursorKey(e);
+    if (cursorKey) {
+        keyboard[cursorKey[0]] |= cursorKey[1];
+        cursorKeysPressed.delete(e.code || e.key);
+        if (cursorKeysPressed.size === 0 && !e.ctrlKey) keyboard[0xFEFE] |= 0x01;
+        e.preventDefault();
+        return;
+    }
+    let k = resolveSpectrumKey(e);
+    if (k && !(k[0] === 0xFEFE && (k[1] & 0x01) && cursorKeysPressed.size > 0)) {
+        keyboard[k[0]] |= k[1];
+    }
+});
+window.addEventListener('blur', releaseAllKeys);
+container.addEventListener('pointerdown', () => container.focus());
+document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAllKeys(); });
+
+document.getElementById('romFile').addEventListener('change', (e) => {
+    const input = e.target;
+    if (!input.files || !input.files.length) return;
+    readRomFiles(input.files)
+        .then((romFiles) => {
+            loadRomSet(romFiles);
+            initZ80();
+        })
+        .catch((err) => log(`ROM load failed: ${err.message}`, 'error'))
+        .finally(() => { input.value = ''; });
+});
+document.getElementById('btnLoad48').addEventListener('click', () => loadBuiltInModel('48K'));
+document.getElementById('btnLoad128').addEventListener('click', () => loadBuiltInModel('128K'));
+document.getElementById('tapFile').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    if (!isTapFileName(file.name)) {
+        log(TAP_ONLY_MSG, 'error');
+        alert(TAP_ONLY_MSG);
+        e.target.value = '';
+        return;
+    }
+
+    const r = new FileReader();
+    r.onload = (ev) => { setTapeBuffer(ev.target.result); };
+    r.readAsArrayBuffer(file);
+});
+function handleFullscreenStateChanged() {
+    const active = getFullscreenElement() === monitor;
+    monitor.classList.toggle('is-fullscreen', active);
+    btnFullscreen.innerHTML = active ? '<span class="shortcut-badge">F2</span> Windowed' : '<span class="shortcut-badge">F2</span> Fullscreen';
+    updateLargeViewButtonState(active);
+    syncDisplayScale();
+    container.focus();
+}
+document.addEventListener('fullscreenchange', handleFullscreenStateChanged);
+document.addEventListener('webkitfullscreenchange', handleFullscreenStateChanged);
+window.addEventListener('resize', syncDisplayScale);
+monitor.classList.remove('is-fullscreen');
+btnFullscreen.innerHTML = '<span class="shortcut-badge">F2</span> Fullscreen';
+updateLargeViewButtonState(false);
+syncDisplayScale();
+document.getElementById('btnReset').addEventListener('click', resetSystem);
+btnLargeView.addEventListener('click', () => {
+    toggleLargeView();
+});
+btnSamples.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleSamplesMenu();
+});
+btnSamplesClose.addEventListener('click', () => {
+    closeSamplesMenu();
+    container.focus();
+});
+btnAbout.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openAbout();
+});
+btnAboutClose.addEventListener('click', closeAbout);
+aboutModal.addEventListener('click', (e) => {
+    if (e.target === aboutModal) closeAbout();
+});
+sampleSelect.addEventListener('change', handleSampleSelection);
+samplesMenu.addEventListener('click', (e) => e.stopPropagation());
+document.addEventListener('click', () => {
+    if (samplesMenu.classList.contains('active')) closeSamplesMenu();
+});
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && aboutModal.classList.contains('active')) {
+        closeAbout();
+        return;
+    }
+    if (e.key === 'Escape' && samplesMenu.classList.contains('active')) {
+        closeSamplesMenu();
+        container.focus();
+    }
+});
+</script>
+</body>
+</html>
