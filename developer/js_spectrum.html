@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JS Spectrum Pro + Low Latency Audio</title>
+    <title>JS Spectrum — 48K &amp; 128K</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -164,6 +164,7 @@
         
         input[type="file"] { display: none; }
         .samples-menu {
+            box-sizing: border-box;
             position: absolute;
             top: calc(100% + 12px);
             left: 50%;
@@ -312,6 +313,189 @@
             text-transform: uppercase;
         }
         .about-close:hover { background: #343434; }
+
+        body {
+            min-height: 100vh;
+            box-sizing: border-box;
+            padding: 28px 16px 24px;
+            overflow-x: hidden;
+            overflow-y: auto;
+            justify-content: flex-start;
+            gap: 0;
+            background:
+                radial-gradient(ellipse at 50% 25%, rgba(35, 39, 43, 0.72), transparent 58%),
+                #101112;
+        }
+        .header h1 {
+            margin-bottom: 20px;
+            font-size: 15px;
+            letter-spacing: 8px;
+            text-align: center;
+        }
+        .monitor-frame {
+            padding: 12px;
+            border-radius: 16px;
+            background: linear-gradient(145deg, #303235, #171819 35%, #090a0a);
+            box-shadow: 0 0 0 1px #55585b, 0 22px 48px rgba(0, 0, 0, 0.6);
+        }
+        .canvas-wrapper {
+            width: min(512px, calc(100vw - 64px));
+            max-width: calc(100vw - 64px);
+            height: auto !important;
+            aspect-ratio: 4 / 3;
+            background: #000;
+            border-radius: 5px;
+        }
+        .monitor-frame:fullscreen .canvas-wrapper,
+        .monitor-frame:-webkit-full-screen .canvas-wrapper,
+        .monitor-frame.is-fullscreen .canvas-wrapper {
+            max-width: 100vw;
+        }
+        .status-bar {
+            min-height: 16px;
+            margin-top: 12px;
+            font-family: var(--font-ui);
+            font-size: 11px;
+            letter-spacing: 0.25px;
+            text-align: center;
+        }
+        .controls-wrap {
+            width: min(820px, calc(100vw - 32px));
+            margin-top: 20px;
+        }
+        .controls-panel {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: start;
+            gap: 10px;
+            padding: 10px;
+            border-color: #303336;
+            border-radius: 18px;
+            background: linear-gradient(145deg, rgba(35, 37, 39, 0.96), rgba(22, 23, 24, 0.96));
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.34);
+        }
+        .control-group {
+            min-width: 0;
+            box-sizing: border-box;
+            gap: 8px;
+            padding: 12px;
+            border-color: rgba(255, 255, 255, 0.055);
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.025);
+        }
+        .control-group.core {
+            min-width: 0;
+            flex: initial;
+            justify-content: flex-start;
+        }
+        .control-group.display {
+            flex: initial;
+            align-content: center;
+            justify-content: center;
+        }
+        .control-group.meta {
+            grid-column: 1 / -1;
+            justify-content: center;
+            padding: 2px 8px 4px;
+            border: 0;
+            background: transparent;
+        }
+        .model-choice {
+            min-width: 126px;
+            min-height: 94px;
+            padding: 10px 12px 9px;
+            flex-direction: column;
+            justify-content: center;
+            gap: 4px;
+            border-radius: 12px;
+            background: linear-gradient(150deg, #282a2c, #1d1f20);
+            border-color: #414447;
+            text-align: center;
+        }
+        .model-choice:hover:not(:disabled) {
+            background: linear-gradient(150deg, #303335, #232526);
+            border-color: #74797d;
+        }
+        .model-choice.is-selected {
+            border-color: #77c8b7;
+            box-shadow: inset 0 0 0 1px rgba(119, 200, 183, 0.28), 0 0 18px rgba(81, 169, 148, 0.12);
+        }
+        .model-icon {
+            display: block;
+            width: 84px;
+            height: 48px;
+            margin-bottom: 1px;
+        }
+        .model-name {
+            font-size: 13px;
+            line-height: 1.1;
+        }
+        .model-detail {
+            color: #9da2a5;
+            font-size: 10px;
+            font-weight: 500;
+            letter-spacing: 0.15px;
+        }
+        .btn.audio-toggle {
+            min-width: 108px;
+            justify-content: center;
+            color: #c4eee4;
+            background: linear-gradient(145deg, #203a34, #1b2c28);
+            border-color: #3d7465;
+        }
+        .btn.audio-toggle.is-muted {
+            color: #d3d5d6;
+            background: #292b2d;
+            border-color: #4a4e51;
+        }
+        .audio-icon {
+            width: 16px;
+            height: 16px;
+            flex: 0 0 auto;
+        }
+        .btn {
+            min-height: 40px;
+            padding: 9px 13px;
+            border-radius: 10px;
+        }
+        .btn.primary {
+            color: #f0f3f3;
+            background: #292c2e;
+            border-color: #4a4e50;
+        }
+        .btn.primary:hover:not(:disabled) {
+            background: #34383a;
+            border-color: #73797c;
+        }
+        .btn.view {
+            background: #203b42;
+            border-color: #396e7b;
+        }
+        .rom-manual {
+            padding-top: 10px;
+            color: #8d9295;
+            font-size: 12px;
+        }
+        .keyboard-help {
+            margin-top: 14px !important;
+            color: #73797c;
+            text-align: center;
+        }
+        @media (max-width: 700px) {
+            body { padding: 20px 10px 18px; }
+            .header h1 { margin-bottom: 16px; }
+            .controls-wrap { width: min(500px, calc(100vw - 20px)); }
+            .controls-panel { grid-template-columns: minmax(0, 1fr); }
+            .control-group.core { justify-content: center; }
+            .control-group.display { justify-content: center; }
+            .control-group.meta { grid-column: 1; }
+            .model-choice { min-width: 112px; }
+        }
+        @media (max-width: 380px) {
+            .control-group.core { gap: 6px; padding: 8px; }
+            .model-choice { min-width: 102px; padding-inline: 8px; }
+            .btn { padding-inline: 10px; }
+        }
     </style>
 
     <script> var module = {}; </script>
@@ -340,9 +524,52 @@
     <div class="controls-wrap">
         <div class="controls-panel">
             <div class="control-group core">
-                <button class="btn primary" id="btnLoad48" type="button">Start 48K</button>
-                <button class="btn primary" id="btnLoad128" type="button">Start 128K</button>
-                <button class="btn accent" id="btnAudio" type="button" onclick="enableAudio()">Start Audio</button>
+                <button class="btn primary model-choice" id="btnLoad48" type="button" aria-label="Start the 48K ZX Spectrum">
+                    <svg class="model-icon" viewBox="0 0 100 58" role="img" aria-label="ZX Spectrum 48K">
+                        <path d="M8 13 73 7l19 8v33l-19 6-65-7z" fill="#17191a" stroke="#74787a" stroke-width="1.5"/>
+                        <path d="m13 16 58-5 13 5v6l-13-5-58 5z" fill="#26292a"/>
+                        <path d="m16 27 52-5 12 4v15l-12 5-52-5z" fill="#202324" stroke="#4a4e50" stroke-width="1"/>
+                        <g fill="#82888a">
+                            <path d="m21 29 5-.5v3l-5 .5zm8-.8 5-.5v3l-5 .5zm8-.8 5-.5v3l-5 .5zm8-.8 5-.5v3l-5 .5zm8-.8 5-.5v3l-5 .5zm8-.8 5-.5v3l-5 .5z"/>
+                            <path d="m20 35 5 .4v3l-5-.4zm8 .6 5 .4v3l-5-.4zm8 .6 5 .4v3l-5-.4zm8 .6 5 .4v3l-5-.4zm8 .6 5 .4v3l-5-.4zm8 .6 5 .4v3l-5-.4z"/>
+                        </g>
+                        <path d="m16 23 10-1v1l-10 1z" fill="#e52b26"/>
+                        <path d="m27 22 10-1v1l-10 1z" fill="#f3d529"/>
+                        <path d="m38 21 10-1v1l-10 1z" fill="#24a85a"/>
+                        <path d="m49 20 10-1v1l-10 1z" fill="#268dd0"/>
+                        <path d="m60 19 10-1v1l-10 1z" fill="#c94d9d"/>
+                    </svg>
+                    <span class="model-name">48K Spectrum</span>
+                    <span class="model-detail">The original classic</span>
+                </button>
+                <button class="btn primary model-choice" id="btnLoad128" type="button" aria-label="Start the 128K ZX Spectrum">
+                    <svg class="model-icon" viewBox="0 0 100 58" role="img" aria-label="ZX Spectrum 128K toastrack">
+                        <path d="M8 13 75 7l17 8v33l-17 6-67-7z" fill="#252729" stroke="#858a8d" stroke-width="1.5"/>
+                        <path d="m13 17 58-5 14 5v5l-14-5-58 5z" fill="#333638"/>
+                        <path d="m16 27 48-5 10 3v15l-10 5-48-5z" fill="#1c1e1f" stroke="#4e5356" stroke-width="1"/>
+                        <g fill="#858b8e">
+                            <path d="m20 29 4-.4v3l-4 .4zm7-.7 4-.4v3l-4 .4zm7-.7 4-.4v3l-4 .4zm7-.7 4-.4v3l-4 .4zm7-.7 4-.4v3l-4 .4zm7-.7 4-.4v3l-4 .4z"/>
+                            <path d="m20 35 4 .3v3l-4-.3zm7 .5 4 .3v3l-4-.3zm7 .5 4 .3v3l-4-.3zm7 .5 4 .3v3l-4-.3zm7 .5 4 .3v3l-4-.3zm7 .5 4 .3v3l-4-.3z"/>
+                        </g>
+                        <path d="M70 25h13v17l-13 4z" fill="#181a1b" stroke="#555a5d" stroke-width="1"/>
+                        <path d="M73 28h7v2h-7zm0 4h7v2h-7zm0 4h7v2h-7z" fill="#898f91"/>
+                        <path d="M73 12h1v10h-1zm3-.3h1v10h-1zm3-.3h1v10h-1zm3-.3h1v10h-1zm3-.3h1v10h-1z" fill="#686e71"/>
+                        <path d="m16 23 10-1v1l-10 1z" fill="#e52b26"/>
+                        <path d="m27 22 10-1v1l-10 1z" fill="#f3d529"/>
+                        <path d="m38 21 10-1v1l-10 1z" fill="#24a85a"/>
+                        <path d="m49 20 10-1v1l-10 1z" fill="#268dd0"/>
+                        <path d="m60 19 8-1v1l-8 1z" fill="#c94d9d"/>
+                    </svg>
+                    <span class="model-name">128K Toastrack</span>
+                    <span class="model-detail">The 128K classic</span>
+                </button>
+                <button class="btn audio-toggle" id="btnAudio" type="button" aria-pressed="true" aria-label="Mute audio">
+                    <svg class="audio-icon" viewBox="0 0 20 20" aria-hidden="true">
+                        <path d="M3 8v4h3l4 3V5L6 8H3z" fill="currentColor"/>
+                        <path d="M13 7a4 4 0 0 1 0 6m2-8a7 7 0 0 1 0 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                    </svg>
+                    <span id="audioButtonLabel">Audio on</span>
+                </button>
                 <label class="btn">Load Tape<input type="file" id="tapFile" disabled accept=".tap,.TAP"></label>
                 <button id="btnSamples" class="btn" type="button" disabled aria-expanded="false">Samples</button>
                 <button id="btnReset" class="btn" type="button" disabled>Reset</button>
@@ -372,7 +599,7 @@
         </div>
     </div>
     
-    <div style="margin-top:15px; font-size: 12px; color: #555;">
+    <div class="keyboard-help" style="font-size: 12px; color: #555;">
         PC <b>Ctrl</b> = Caps Shift &nbsp;|&nbsp; PC <b>Shift</b> = Symbol Shift &nbsp;|&nbsp; <b>Arrow keys</b> = Spectrum cursor keys
     </div>
     <div id="aboutModal" class="about-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
@@ -432,6 +659,8 @@ const EMBEDDED_TAP_BASE64 = {};
 // --- AUDIO SYSTEM ---
 let audioCtx = null;
 let audioGain = null;
+let audioMuted = false;
+let audioUnavailable = false;
 let nextAudioTime = 0;
 const AUDIO_SAMPLE_RATE = 44100;
 const T_STATES_PER_FRAME = 70000;
@@ -440,18 +669,48 @@ let lastSpeakerState = 0;
 
 function enableAudio() {
     if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: AUDIO_SAMPLE_RATE });
+        const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextConstructor) {
+            audioUnavailable = true;
+            updateAudioButton();
+            log('Audio is not supported by this browser.', 'error');
+            return;
+        }
+        audioCtx = new AudioContextConstructor({ sampleRate: AUDIO_SAMPLE_RATE });
         audioGain = audioCtx.createGain();
-        audioGain.gain.value = 0.10; // Lower volume for comfort
+        audioGain.gain.value = audioMuted ? 0 : 0.10;
         audioGain.connect(audioCtx.destination);
         nextAudioTime = audioCtx.currentTime;
-        const audioBtn = document.getElementById('btnAudio');
-        audioBtn.disabled = true;
-        audioBtn.textContent = 'Audio Enabled';
-        log("Audio Enabled. Ready.", 'success');
-    } else if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
     }
+
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume().catch((error) => {
+            log(`Could not resume audio: ${error.message}`, 'error');
+        });
+    }
+}
+
+function updateAudioButton() {
+    const audioBtn = document.getElementById('btnAudio');
+    const label = document.getElementById('audioButtonLabel');
+    const muted = audioMuted || audioUnavailable;
+    audioBtn.classList.toggle('is-muted', muted);
+    audioBtn.setAttribute('aria-pressed', String(!muted));
+    audioBtn.setAttribute('aria-label', audioUnavailable ? 'Audio unavailable' : (muted ? 'Unmute audio' : 'Mute audio'));
+    label.textContent = audioUnavailable ? 'Audio unavailable' : (muted ? 'Audio muted' : 'Audio on');
+    audioBtn.disabled = audioUnavailable;
+    const speakerWave = audioBtn.querySelector('.audio-icon');
+    speakerWave.innerHTML = muted
+        ? '<path d="M3 8v4h3l4 3V5L6 8H3z" fill="currentColor"/><path d="m13 8 4 4m0-4-4 4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>'
+        : '<path d="M3 8v4h3l4 3V5L6 8H3z" fill="currentColor"/><path d="M13 7a4 4 0 0 1 0 6m2-8a7 7 0 0 1 0 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>';
+}
+
+function toggleAudioMute() {
+    audioMuted = !audioMuted;
+    if (audioGain && audioCtx) {
+        audioGain.gain.setTargetAtTime(audioMuted ? 0 : 0.10, audioCtx.currentTime, 0.015);
+    }
+    updateAudioButton();
 }
 
 function processAudioFrame(log) {
@@ -511,6 +770,11 @@ const aboutModal = document.getElementById('aboutModal');
 const btnAboutClose = document.getElementById('btnAboutClose');
 let sampleCatalog = [];
 let displayMode = 'default';
+
+function updateModelSelection() {
+    document.getElementById('btnLoad48').classList.toggle('is-selected', machineModel === '48K' && !!z80);
+    document.getElementById('btnLoad128').classList.toggle('is-selected', machineModel === '128K' && !!z80);
+}
 
 function getFullscreenElement() {
     return document.fullscreenElement || document.webkitFullscreenElement;
@@ -741,6 +1005,7 @@ function loadRomSet(romFiles) {
         romBanks = [];
         memory.set(romFiles[0].bytes, 0);
     }
+    updateModelSelection();
 }
 
 async function fetchRomFile(path) {
@@ -753,6 +1018,13 @@ async function fetchRomFile(path) {
 async function loadBuiltInModel(model) {
     const buttons = [document.getElementById('btnLoad48'), document.getElementById('btnLoad128')];
     buttons.forEach((button) => { button.disabled = true; });
+    try {
+        enableAudio();
+    } catch (error) {
+        audioUnavailable = true;
+        updateAudioButton();
+        log(`Could not initialize audio: ${error.message}`, 'error');
+    }
     isRunning = false;
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
     log(`Loading ${model} ROM${model === '128K' ? 's' : ''}...`, 'normal');
@@ -936,6 +1208,7 @@ function initZ80() {
     });
 
     log(`${machineModel} ROM${machineModel === '128K' ? 's' : ''} loaded.`, 'success');
+    updateModelSelection();
     document.getElementById('btnReset').disabled = false;
     document.getElementById('tapFile').disabled = false;
     document.getElementById('btnSamples').disabled = false;
@@ -1170,6 +1443,13 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) relea
 document.getElementById('romFile').addEventListener('change', (e) => {
     const input = e.target;
     if (!input.files || !input.files.length) return;
+    try {
+        enableAudio();
+    } catch (error) {
+        audioUnavailable = true;
+        updateAudioButton();
+        log(`Could not initialize audio: ${error.message}`, 'error');
+    }
     readRomFiles(input.files)
         .then((romFiles) => {
             loadRomSet(romFiles);
@@ -1210,6 +1490,7 @@ btnFullscreen.innerHTML = '<span class="shortcut-badge">F2</span> Fullscreen';
 updateLargeViewButtonState(false);
 syncDisplayScale();
 document.getElementById('btnReset').addEventListener('click', resetSystem);
+document.getElementById('btnAudio').addEventListener('click', toggleAudioMute);
 btnLargeView.addEventListener('click', () => {
     toggleLargeView();
 });
@@ -1244,6 +1525,7 @@ document.addEventListener('keydown', (e) => {
         container.focus();
     }
 });
+updateAudioButton();
 </script>
 </body>
 </html>

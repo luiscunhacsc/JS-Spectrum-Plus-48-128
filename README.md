@@ -15,7 +15,8 @@ Alternatively, open **`index.html`** directly in a modern browser.
 After the emulator opens:
 
 1. Select **Start 48K** or **Start 128K**.
-2. Optionally select **Start Audio**. Browsers require a click before playing sound.
+2. Audio is on by default and starts when you launch a model. Select **Audio
+   on** to mute or unmute it. Browsers require a click before playing sound.
 3. To play a tape, select **Load Tape**, choose a `.tap` file, then type `LOAD ""` and press Enter.
 
 The app is a single, self-contained HTML file. The emulator code, both models'
