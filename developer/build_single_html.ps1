@@ -8,7 +8,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-function Replace-Strict {
+function Update-RequiredText {
     param(
         [string]$Content,
         [string]$Search,
@@ -81,15 +81,15 @@ if (Test-Path $tapDir) {
 $embeddedTapJson = if ($embeddedTapMap.Count -gt 0) { $embeddedTapMap | ConvertTo-Json -Compress } else { "{}" }
 
 $inlineZ80 = "<script>`r`n$z80`r`n</script>"
-$html = Replace-Strict -Content $html -Search '<script src="Z80.js"></script>' -Replace $inlineZ80 -Label 'external Z80 script tag'
-$html = Replace-Strict -Content $html -Search 'src="keyboard.jpg"' -Replace "src=`"data:image/jpeg;base64,$keyboardB64`"" -Label 'keyboard image source'
+$html = Update-RequiredText -Content $html -Search '<script src="Z80.js"></script>' -Replace $inlineZ80 -Label 'external Z80 script tag'
+$html = Update-RequiredText -Content $html -Search 'src="keyboard.jpg"' -Replace "src=`"data:image/jpeg;base64,$keyboardB64`"" -Label 'keyboard image source'
 foreach ($modelImage in @('spectrum-48k.png', 'spectrum-128k.png')) {
     $modelImagePath = Join-Path $root "assets/$modelImage"
     $modelImageB64 = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($modelImagePath))
-    $html = Replace-Strict -Content $html -Search "src=`"assets/$modelImage`"" -Replace "src=`"data:image/png;base64,$modelImageB64`"" -Label "$modelImage source"
+    $html = Update-RequiredText -Content $html -Search "src=`"assets/$modelImage`"" -Replace "src=`"data:image/png;base64,$modelImageB64`"" -Label "$modelImage source"
 }
-$html = Replace-Strict -Content $html -Search 'const EMBEDDED_TAP_BASE64 = {};' -Replace "const EMBEDDED_TAP_BASE64 = $embeddedTapJson;" -Label 'embedded TAP map placeholder'
-$html = Replace-Strict -Content $html -Search 'const EMBEDDED_ROM_BASE64 = {};' -Replace "const EMBEDDED_ROM_BASE64 = $embeddedRomJson;" -Label 'embedded ROM map placeholder'
+$html = Update-RequiredText -Content $html -Search 'const EMBEDDED_TAP_BASE64 = {};' -Replace "const EMBEDDED_TAP_BASE64 = $embeddedTapJson;" -Label 'embedded TAP map placeholder'
+$html = Update-RequiredText -Content $html -Search 'const EMBEDDED_ROM_BASE64 = {};' -Replace "const EMBEDDED_ROM_BASE64 = $embeddedRomJson;" -Label 'embedded ROM map placeholder'
 
 [System.IO.File]::WriteAllText($outputPath, $html, [System.Text.UTF8Encoding]::new($false))
 
