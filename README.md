@@ -14,18 +14,25 @@ Alternatively, open **`index.html`** directly in a modern browser.
 
 After the emulator opens:
 
-1. Select **Start 48K** or **Start 128K**.
+1. Select the **48K** or **128K** model card to start. The selected card shows
+   **Running**; selecting it again restarts that model.
 2. Audio is on by default and starts when you launch a model. Select **Audio
    on** to mute or unmute it. Browsers require a click before playing sound.
-3. To play a tape, select **Load Tape**, choose a `.tap` file, then type `LOAD ""` and press Enter.
+3. To play a tape, select **Load tape**, choose a `.tap` file (or drop one onto
+   the tape deck), then type `LOAD ""` and press Enter. **Sample games** opens
+   the bundled tape library. On 48K, press **J** for LOAD, then **Shift + P**
+   twice for the quotes.
+   On 128K, choose **48 BASIC** from the Spectrum menu before loading a tape.
 
 The app is a single, self-contained HTML file. The emulator code, both models'
-ROMs, keyboard image, and sample tapes are embedded in it; no installation,
+ROMs, model images, keyboard map, and sample tapes are embedded in it; no installation,
 server, or additional files are needed to run it.
 
 ## Keyboard
 
 - Click the emulator display to focus keyboard input.
+- The footer shows **Keyboard connected** when the display has focus. Tab
+  moves to the controls, where Enter and Space work normally.
 - **F1** toggles the keyboard map.
 - **F2** toggles fullscreen.
 - **F3** toggles large view.

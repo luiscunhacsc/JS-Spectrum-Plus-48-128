@@ -6,495 +6,146 @@
     <title>JS Spectrum — 48K &amp; 128K</title>
     <style>
         :root {
-            --bg-color: #121212;
-            --panel-color: #1e1e1e;
-            --accent-red: #d00000;
-            --text-color: #e0e0e0;
+            color-scheme: dark;
+            --bg: #101214;
+            --panel: #191c1f;
+            --line: #303438;
+            --text: #eef0ed;
+            --muted: #9ba29f;
+            --accent: #b8e5cb;
             --font-ui: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         }
-
-        body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: var(--font-ui);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-            overflow: hidden;
-        }
-
-        .header h1 {
-            margin: 0 0 20px 0;
-            font-weight: 300; letter-spacing: 6px; font-size: 24px; text-transform: uppercase;
-            background: linear-gradient(90deg, var(--accent-red), #cccc00, #00cc00, #00cccc);
-            -webkit-background-clip: text; background-clip: text; color: transparent;
-            text-shadow: 0 0 10px rgba(255,255,255,0.1);
-        }
-
-        .monitor-frame {
-            position: relative; background: #000; padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 0 0 4px #333, 0 30px 60px rgba(0,0,0,0.8);
-            transition: box-shadow 0.1s;
-        }
-
-        .canvas-wrapper {
-            width: 512px; height: 384px;
-            aspect-ratio: 4 / 3;
-            background: #000; border-radius: 4px; overflow: hidden; outline: none; cursor: pointer;
-        }
+        * { box-sizing: border-box; }
+        [hidden] { display: none !important; }
+        body { margin: 0; min-width: 300px; background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 14px; -webkit-font-smoothing: antialiased; }
+        button, input, select { font: inherit; }
+        button { cursor: pointer; }
+        button, a, summary, select, .canvas-wrapper { -webkit-tap-highlight-color: transparent; }
+        button:focus-visible, a:focus-visible, summary:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+        button:disabled { opacity: .38; cursor: not-allowed; }
+        button, a, summary { touch-action: manipulation; }
+        .app-shell { width: min(1220px, 100%); margin: 0 auto; padding: 30px 36px 22px; }
+        .app-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-bottom: 25px; border-bottom: 1px solid var(--line); margin-bottom: 28px; }
+        .brand { display: flex; align-items: center; gap: 15px; }
+        .spectrum-mark { display: flex; width: 35px; height: 32px; overflow: hidden; transform: skew(-18deg); gap: 2px; }
+        .spectrum-mark i { flex: 1; background: #f16365; }
+        .spectrum-mark i:nth-child(2) { background: #f2d764; }
+        .spectrum-mark i:nth-child(3) { background: #77cb91; }
+        .spectrum-mark i:nth-child(4) { background: #6dc9e5; }
+        h1 { font-size: 23px; letter-spacing: -.8px; font-weight: 650; margin: 0; }
+        .brand p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+        .header-actions { display: flex; align-items: center; gap: 22px; }
+        .edition-label { color: #7e8783; font: 11px Consolas, monospace; letter-spacing: 1.5px; }
+        .workspace { display: grid; grid-template-columns: minmax(0, 1fr) 294px; gap: 24px; align-items: start; }
+        .player-column { min-width: 0; }
+        .display-panel { overflow: hidden; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; }
+        .display-heading { height: 51px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 20px; }
+        .display-label { display: flex; align-items: center; gap: 9px; color: #b6bdb9; font-size: 11px; letter-spacing: 1.3px; font-weight: 600; }
+        .status-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #727c76; flex: 0 0 auto; }
+        .is-running .display-label .status-dot { background: var(--accent); box-shadow: 0 0 8px #b8e5cb44; }
+        .display-spec { color: #78827d; font: 10px Consolas, monospace; letter-spacing: .4px; }
+        .display-stage { display: flex; align-items: center; justify-content: center; padding: 16px 20px 24px; background: #141719; }
+        .monitor-frame { position: relative; max-width: 100%; padding: 7px; border: 1px solid #333a36; border-radius: 5px; background: #080a09; box-shadow: 0 12px 32px #0005; }
+        .canvas-wrapper { position: relative; width: 512px; max-width: 100%; aspect-ratio: 4 / 3; overflow: hidden; outline: none; background: #050706; cursor: text; }
+        .canvas-wrapper:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
         canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
-        
-        .monitor-frame:fullscreen,
-        .monitor-frame:-webkit-full-screen {
-            position: fixed;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            border-radius: 0;
-            box-sizing: border-box;
-            overflow: hidden;
-            display: grid;
-            place-items: center;
-            box-shadow: none;
-            background: #000;
-        }
-        .monitor-frame.is-fullscreen {
-            position: fixed;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            border-radius: 0;
-            box-sizing: border-box;
-            overflow: hidden;
-            display: grid;
-            place-items: center;
-            box-shadow: none;
-            background: #000;
-        }
+        .screen-idle { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; text-align: center; background: radial-gradient(ellipse at 50% 45%, #1c2620 0%, #080d0a 65%); }
+        .idle-cursor { display: grid; place-items: center; width: 35px; height: 41px; margin-bottom: 25px; background: var(--accent); color: #111b15; font: bold 29px Consolas, monospace; box-shadow: 5px 5px 0 #b8e5cb14; }
+        .eyebrow { margin: 0; color: #8eae9a; font: 10px Consolas, monospace; letter-spacing: 2px; }
+        .screen-idle h2 { margin: 12px 0 9px; font-size: clamp(18px, 2.1vw, 27px); font-weight: 500; letter-spacing: -.7px; }
+        .screen-idle p:last-child { margin: 0; color: #8e9d94; font-size: 12px; line-height: 1.6; }
+        .display-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; padding: 10px 12px; border-top: 1px solid #292d30; }
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 38px; padding: 9px 12px; border: 1px solid #3b4240; border-radius: 7px; background: #282e2b; color: #e5eae6; font-size: 12px; font-weight: 550; line-height: 1.2; white-space: nowrap; transition: background .16s, border-color .16s, color .16s; }
+        .btn:hover:not(:disabled) { background: #363e39; border-color: #647168; }
+        .btn.quiet { background: transparent; border-color: transparent; color: #acb5ae; }
+        .btn.quiet:hover:not(:disabled) { background: #ffffff09; border-color: #ffffff0d; color: var(--text); }
+        .btn.primary { background: var(--accent); color: #17271d; border-color: var(--accent); }
+        .btn.primary:hover:not(:disabled) { background: #cff4df; border-color: #cff4df; }
+        .btn.toggle-active { background: #b8e5cb12; color: var(--accent); border-color: #b8e5cb3d; }
+        .icon { display: block; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 auto; }
+        .shortcut-badge, kbd { border: 1px solid #464e48; border-radius: 4px; background: #ffffff04; color: #9daaa0; padding: 2px 4px; font: 10px Consolas, monospace; }
+        .audio-toggle { margin-left: auto; }
+        .audio-toggle:not(.is-muted) { color: var(--accent); }
+        .audio-icon { width: 16px; height: 16px; flex: 0 0 auto; }
+        .status-bar { display: flex; align-items: flex-start; gap: 9px; min-height: 45px; padding: 13px 3px 10px; color: #a2ada5; font-size: 11px; line-height: 1.5; }
+        .status-bar .status-dot { margin-top: 5px; width: 5px; height: 5px; background: #66766b; }
+        .status-bar[data-tone='success'] .status-dot { background: var(--accent); }
+        .status-bar[data-tone='error'] { color: #ffa6a0; }
+        .status-bar[data-tone='error'] .status-dot { background: #ffa6a0; }
+        .tape-deck { position: relative; padding: 18px 20px; background: var(--panel); border: 1px solid var(--line); border-radius: 13px; transition: border-color .16s; }
+        .tape-deck.is-dragging { border-color: var(--accent); background: #1e2c23; }
+        .deck-heading { display: flex; align-items: center; gap: 9px; margin-bottom: 15px; }
+        .deck-heading h2 { font-size: 13px; font-weight: 600; margin: 0; }
+        .deck-heading .icon { color: #a9b4ac; width: 19px; height: 19px; }
+        .file-type { margin-left: auto; color: #829087; font: 10px Consolas, monospace; letter-spacing: .7px; }
+        .tape-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+        .tape-controls #btnReset { margin-left: auto; }
+        .tape-info { display: flex; align-items: center; gap: 8px; min-width: 0; margin-top: 15px; font-size: 11px; color: #8e9b92; }
+        .tape-info .status-dot { width: 5px; height: 5px; }
+        .has-tape .tape-info .status-dot { background: var(--accent); }
+        #tapeName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .deck-hint { margin: 10px 0 0; color: #7f8c83; font-size: 11px; line-height: 1.6; }
+        .deck-hint code { color: #c1cdc4; font-family: Consolas, monospace; }
+        .machine-panel { min-width: 0; }
+        .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 1px 0 8px; }
+        .section-heading h2 { margin: 0; color: #d0d6d1; font-size: 13px; font-weight: 600; }
+        .section-index { color: #67766b; font: 10px Consolas, monospace; letter-spacing: 1px; }
+        .section-description { margin: 0 0 17px; color: #88958d; font-size: 11px; line-height: 1.5; }
+        .model-options { display: grid; gap: 12px; }
+        .model-choice { width: 100%; display: flex; flex-direction: column; text-align: left; color: var(--text); border: 1px solid #363e38; background: #1b201d; border-radius: 12px; padding: 15px 17px 0; overflow: hidden; transition: border-color .2s, background .2s; }
+        .model-choice:hover:not(:disabled) { border-color: #7d9f88; background: #222b25; }
+        .model-choice.is-selected { border-color: #91b99d; background: #202a23; }
+        .model-title { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .model-name { font-size: 13px; font-weight: 600; letter-spacing: -.15px; }
+        .model-memory { border: 1px solid #56634f; border-radius: 4px; padding: 3px 5px; color: #b7c5b7; font: 10px Consolas, monospace; }
+        .model-detail { display: block; margin-top: 5px; color: #84958a; font-size: 10px; }
+        .model-image-wrap { display: flex; align-items: center; justify-content: center; width: 100%; height: 126px; padding: 13px 0 8px; }
+        .model-icon { display: block; max-width: 100%; width: 220px; height: 100%; object-fit: contain; filter: drop-shadow(0 9px 6px #0005); transition: transform .2s; }
+        .model-choice:hover:not(:disabled) .model-icon { transform: translateY(-2px); }
+        .model-action { width: calc(100% + 34px); margin: 0 -17px; padding: 11px 17px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #ffffff0b; color: #b5c5b9; font-size: 11px; font-weight: 550; }
+        .model-choice.is-selected .model-action { color: var(--accent); background: #b8e5cb06; }
+        .model-action .icon { width: 14px; height: 14px; }
+        .rom-manual { border-top: 1px solid var(--line); margin-top: 19px; padding-top: 15px; color: #91a096; font-size: 11px; }
+        .rom-manual summary { cursor: pointer; padding: 4px 0; }
+        .rom-manual p { font-size: 11px; line-height: 1.6; color: #849087; margin: 10px 0; }
+        .rom-manual .btn { width: 100%; margin-top: 2px; }
+        input[type='file'] { display: none; }
+        .app-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; border-top: 1px solid var(--line); margin-top: 27px; padding-top: 18px; color: #78867d; font-size: 10px; line-height: 1.7; }
+        .keyboard-help { display: flex; flex-wrap: wrap; gap: 15px; }
+        .keyboard-help span { white-space: nowrap; }
+        .focus-hint { display: flex; align-items: center; gap: 7px; color: #96aa9d; }
+        .overlay { position: absolute; inset: 0; background: #080c09ed; backdrop-filter: blur(5px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 20px; z-index: 10; }
+        .overlay img { max-width: 100%; max-height: 75%; border-radius: 5px; }
+        .overlay-hint { color: #b3c5b8; font-size: 12px; }
+        .samples-menu, .about-modal { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 22px; z-index: 50; background: #080a09c9; backdrop-filter: blur(7px); }
+        .dialog-card { width: min(520px, 100%); max-height: 85dvh; overflow: auto; padding: 25px; background: #1b201d; border: 1px solid #48554b; border-radius: 16px; box-shadow: 0 25px 80px #0007; }
+        .about-card { width: min(660px, 100%); line-height: 1.65; }
+        .dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 16px; }
+        .samples-menu-title, .about-title { font-size: 20px; font-weight: 550; letter-spacing: -.4px; margin: 0; }
+        .samples-label { display: block; color: #b0bdb3; font-size: 12px; margin-bottom: 10px; }
+        .samples-select { width: 100%; border: 1px solid #4d5d50; border-radius: 7px; background: #111713; color: var(--text); padding: 12px 10px; font-size: 13px; }
+        .samples-hint { color: #9aafa0; font-size: 12px; line-height: 1.7; margin: 17px 0 0; }
+        .samples-hint code { color: var(--accent); }
+        .about-card p { color: #b0bdb3; font-size: 13px; margin: 14px 0; }
+        .about-card a { color: var(--accent); overflow-wrap: anywhere; }
+        .about-close { margin-top: 8px; }
+        .is-large .workspace { grid-template-columns: minmax(0, 1fr); }
+        .is-large .machine-panel { max-width: 100%; }
+        .is-large .model-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .is-large .model-image-wrap { height: 140px; }
+        .is-large .rom-manual .btn { width: auto; }
+        .monitor-frame:fullscreen, .monitor-frame:-webkit-full-screen, .monitor-frame.is-fullscreen { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; margin: 0; padding: 0; border: 0; border-radius: 0; display: grid; place-items: center; box-shadow: none !important; background: #000; }
         .monitor-frame:fullscreen::backdrop { background: #000; }
-        .monitor-frame:-webkit-full-screen .canvas-wrapper,
-        .monitor-frame:fullscreen .canvas-wrapper {
-            border-radius: 0;
-            margin: 0;
-        }
-        .monitor-frame.is-fullscreen .canvas-wrapper {
-            border-radius: 0;
-            margin: 0;
-        }
-
-        .overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(5px);
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            opacity: 0; pointer-events: none; transition: opacity 0.3s ease; z-index: 10;
-        }
-        .overlay.active { opacity: 1; pointer-events: auto; }
-        .overlay img { max-width: 90%; max-height: 80%; border-radius: 8px; border: 1px solid #444; }
-        .overlay-hint { margin-top: 15px; font-size: 14px; color: #aaa; }
-
-        .controls-wrap {
-            position: relative;
-            margin-top: 24px;
-            width: min(980px, calc(100vw - 28px));
-        }
-        .controls-panel {
-            margin-top: 0;
-            background: linear-gradient(180deg, #1e1e1e 0%, #171717 100%);
-            padding: 12px;
-            border-radius: 16px;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            align-items: stretch;
-            justify-content: center;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.35);
-            border: 1px solid #333;
-        }
-        .control-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            align-items: center;
-            justify-content: center;
-            padding: 8px;
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid #2f2f2f;
-        }
-        .control-group.core { flex: 1 1 540px; }
-        .control-group.display { flex: 1 1 320px; }
-        .control-group.meta { flex: 0 1 auto; }
-        @media (max-width: 760px) {
-            .controls-wrap { width: min(620px, calc(100vw - 20px)); }
-            .controls-panel { padding: 10px; gap: 8px; }
-            .control-group { width: 100%; justify-content: flex-start; }
-        }
-        .btn {
-            background: #2b2f33;
-            color: #f1f1f1;
-            border: 1px solid #444b52;
-            padding: 9px 16px;
-            border-radius: 11px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            text-transform: none;
-            letter-spacing: 0.2px;
-            min-height: 38px;
-        }
-        .btn:hover:not(:disabled) { background: #353b41; transform: translateY(-1px); border-color: #59616a; }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn.primary { background: linear-gradient(135deg, #9b1f1f, #d00000); border-color: #e44747; color: #fff; }
-        .btn.accent { background: linear-gradient(135deg, #5d4200, #9a6f00); border-color: #d0a03a; color: #fff; }
-        .btn.view { background: linear-gradient(135deg, #004a61, #006f92); border-color: #00a2d1; color: #fff; }
-        .btn.toggle-active { box-shadow: 0 0 0 2px rgba(0, 200, 255, 0.25); border-color: #66d9ff; }
-        .btn.meta { background: #262730; border-color: #4d4f67; }
-        
-        input[type="file"] { display: none; }
-        .samples-menu {
-            box-sizing: border-box;
-            position: absolute;
-            top: calc(100% + 12px);
-            left: 50%;
-            width: min(540px, calc(100vw - 28px));
-            transform: translateX(-50%) translateY(-6px);
-            background: linear-gradient(180deg, #111 0%, #171717 100%);
-            border: 1px solid #3a3a3a;
-            border-radius: 14px;
-            box-shadow: 0 14px 28px rgba(0, 0, 0, 0.55);
-            padding: 14px 14px 12px 14px;
-            z-index: 30;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.2s ease, transform 0.2s ease;
-        }
-        .samples-menu.active {
-            opacity: 1;
-            pointer-events: auto;
-            transform: translateX(-50%) translateY(0);
-        }
-        .samples-menu-title {
-            font-size: 12px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1.1px;
-            color: #f2f2f2;
-        }
-        .samples-menu-accent {
-            height: 2px;
-            margin: 8px 0 10px 0;
-            border-radius: 2px;
-            background: linear-gradient(90deg, #d00000, #d7d700, #00d700, #00d7d7);
-        }
-        .samples-label {
-            display: block;
-            margin-bottom: 7px;
-            font-size: 12px;
-            color: #bdbdbd;
-        }
-        .samples-select {
-            width: 100%;
-            border: 1px solid #4a4a4a;
-            border-radius: 8px;
-            background: #0d0d0d;
-            color: #f2f2f2;
-            font-size: 13px;
-            padding: 10px 12px;
-            outline: none;
-        }
-        .samples-select:focus {
-            border-color: #00d7d7;
-            box-shadow: 0 0 0 2px rgba(0, 215, 215, 0.2);
-        }
-        .samples-meta {
-            margin-top: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-        }
-        .samples-hint {
-            margin: 0;
-            color: #9c9c9c;
-            font-size: 11px;
-            line-height: 1.35;
-        }
-        .samples-close {
-            border: 1px solid #4a4a4a;
-            background: #282828;
-            color: #efefef;
-            border-radius: 999px;
-            padding: 6px 12px;
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-            cursor: pointer;
-            text-transform: uppercase;
-        }
-        .samples-close:hover { background: #343434; }
-        .status-bar { margin-top: 15px; font-family: monospace; font-size: 12px; color: #666; }
-        .shortcut-badge { background: #333; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 11px; border: 1px solid #444; color: #ccc; }
-        .about-modal {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.78);
-            backdrop-filter: blur(4px);
-            z-index: 50;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.2s ease;
-        }
-        .about-modal.active {
-            opacity: 1;
-            pointer-events: auto;
-        }
-        .about-card {
-            width: min(760px, 100%);
-            max-height: min(86vh, 800px);
-            overflow: auto;
-            border-radius: 14px;
-            border: 1px solid #3a3a3a;
-            background: linear-gradient(180deg, #141414 0%, #0f0f0f 100%);
-            box-shadow: 0 20px 42px rgba(0, 0, 0, 0.65);
-            padding: 18px 20px 16px 20px;
-            line-height: 1.55;
-        }
-        .about-title {
-            margin: 0;
-            font-size: 18px;
-            font-weight: 700;
-            letter-spacing: 0.4px;
-            color: #f2f2f2;
-        }
-        .about-accent {
-            height: 2px;
-            margin: 10px 0 12px 0;
-            border-radius: 2px;
-            background: linear-gradient(90deg, #d00000, #d7d700, #00d700, #00d7d7);
-        }
-        .about-card p {
-            margin: 10px 0;
-            color: #d1d1d1;
-            font-size: 14px;
-        }
-        .about-card a {
-            color: #7ee9ff;
-        }
-        .about-card a:hover {
-            color: #b8f4ff;
-        }
-        .about-close {
-            margin-top: 6px;
-            border: 1px solid #4a4a4a;
-            background: #282828;
-            color: #efefef;
-            border-radius: 999px;
-            padding: 8px 14px;
-            font-size: 12px;
-            font-weight: 700;
-            letter-spacing: 0.6px;
-            cursor: pointer;
-            text-transform: uppercase;
-        }
-        .about-close:hover { background: #343434; }
-
-        body {
-            min-height: 100vh;
-            box-sizing: border-box;
-            padding: 28px 16px 24px;
-            overflow-x: hidden;
-            overflow-y: auto;
-            justify-content: flex-start;
-            gap: 0;
-            background:
-                radial-gradient(ellipse at 50% 25%, rgba(35, 39, 43, 0.72), transparent 58%),
-                #101112;
-        }
-        .header h1 {
-            margin-bottom: 20px;
-            font-size: 15px;
-            letter-spacing: 8px;
-            text-align: center;
-        }
-        .monitor-frame {
-            padding: 12px;
-            border-radius: 16px;
-            background: linear-gradient(145deg, #303235, #171819 35%, #090a0a);
-            box-shadow: 0 0 0 1px #55585b, 0 22px 48px rgba(0, 0, 0, 0.6);
-        }
-        .canvas-wrapper {
-            width: min(512px, calc(100vw - 64px));
-            max-width: calc(100vw - 64px);
-            height: auto !important;
-            aspect-ratio: 4 / 3;
-            background: #000;
-            border-radius: 5px;
-        }
-        .monitor-frame:fullscreen .canvas-wrapper,
-        .monitor-frame:-webkit-full-screen .canvas-wrapper,
-        .monitor-frame.is-fullscreen .canvas-wrapper {
-            max-width: 100vw;
-        }
-        .status-bar {
-            min-height: 16px;
-            margin-top: 12px;
-            font-family: var(--font-ui);
-            font-size: 11px;
-            letter-spacing: 0.25px;
-            text-align: center;
-        }
-        .controls-wrap {
-            width: min(820px, calc(100vw - 32px));
-            margin-top: 20px;
-        }
-        .controls-panel {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            align-items: start;
-            gap: 10px;
-            padding: 10px;
-            border-color: #303336;
-            border-radius: 18px;
-            background: linear-gradient(145deg, rgba(35, 37, 39, 0.96), rgba(22, 23, 24, 0.96));
-            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.34);
-        }
-        .control-group {
-            min-width: 0;
-            box-sizing: border-box;
-            gap: 8px;
-            padding: 12px;
-            border-color: rgba(255, 255, 255, 0.055);
-            border-radius: 14px;
-            background: rgba(255, 255, 255, 0.025);
-        }
-        .control-group.core {
-            min-width: 0;
-            flex: initial;
-            justify-content: flex-start;
-        }
-        .control-group.display {
-            flex: initial;
-            align-content: center;
-            justify-content: center;
-        }
-        .control-group.meta {
-            grid-column: 1 / -1;
-            justify-content: center;
-            padding: 2px 8px 4px;
-            border: 0;
-            background: transparent;
-        }
-        .model-choice {
-            min-width: 126px;
-            min-height: 94px;
-            padding: 10px 12px 9px;
-            flex-direction: column;
-            justify-content: center;
-            gap: 4px;
-            border-radius: 12px;
-            background: linear-gradient(150deg, #282a2c, #1d1f20);
-            border-color: #414447;
-            text-align: center;
-        }
-        .model-choice:hover:not(:disabled) {
-            background: linear-gradient(150deg, #303335, #232526);
-            border-color: #74797d;
-        }
-        .model-choice.is-selected {
-            border-color: #77c8b7;
-            box-shadow: inset 0 0 0 1px rgba(119, 200, 183, 0.28), 0 0 18px rgba(81, 169, 148, 0.12);
-        }
-        .model-icon {
-            display: block;
-            width: 84px;
-            height: 48px;
-            margin-bottom: 1px;
-        }
-        .model-name {
-            font-size: 13px;
-            line-height: 1.1;
-        }
-        .model-detail {
-            color: #9da2a5;
-            font-size: 10px;
-            font-weight: 500;
-            letter-spacing: 0.15px;
-        }
-        .btn.audio-toggle {
-            min-width: 108px;
-            justify-content: center;
-            color: #c4eee4;
-            background: linear-gradient(145deg, #203a34, #1b2c28);
-            border-color: #3d7465;
-        }
-        .btn.audio-toggle.is-muted {
-            color: #d3d5d6;
-            background: #292b2d;
-            border-color: #4a4e51;
-        }
-        .audio-icon {
-            width: 16px;
-            height: 16px;
-            flex: 0 0 auto;
-        }
-        .btn {
-            min-height: 40px;
-            padding: 9px 13px;
-            border-radius: 10px;
-        }
-        .btn.primary {
-            color: #f0f3f3;
-            background: #292c2e;
-            border-color: #4a4e50;
-        }
-        .btn.primary:hover:not(:disabled) {
-            background: #34383a;
-            border-color: #73797c;
-        }
-        .btn.view {
-            background: #203b42;
-            border-color: #396e7b;
-        }
-        .rom-manual {
-            padding-top: 10px;
-            color: #8d9295;
-            font-size: 12px;
-        }
-        .keyboard-help {
-            margin-top: 14px !important;
-            color: #73797c;
-            text-align: center;
-        }
-        @media (max-width: 700px) {
-            body { padding: 20px 10px 18px; }
-            .header h1 { margin-bottom: 16px; }
-            .controls-wrap { width: min(500px, calc(100vw - 20px)); }
-            .controls-panel { grid-template-columns: minmax(0, 1fr); }
-            .control-group.core { justify-content: center; }
-            .control-group.display { justify-content: center; }
-            .control-group.meta { grid-column: 1; }
-            .model-choice { min-width: 112px; }
-        }
-        @media (max-width: 380px) {
-            .control-group.core { gap: 6px; padding: 8px; }
-            .model-choice { min-width: 102px; padding-inline: 8px; }
-            .btn { padding-inline: 10px; }
+        .monitor-frame.is-fullscreen .canvas-wrapper, .monitor-frame:fullscreen .canvas-wrapper { border-radius: 0; max-width: 100vw; }
+        @media (min-width: 1400px) { .app-shell { padding-top: 40px; } .app-header { margin-bottom: 34px; } }
+        @media (max-width: 1050px) { .app-shell { padding: 24px; } .workspace { grid-template-columns: minmax(0, 1fr) 258px; gap: 20px; } .display-stage { padding: 14px 13px 20px; } .display-toolbar { padding: 8px; gap: 3px; } .display-toolbar .btn { padding: 8px; font-size: 11px; } .display-toolbar .shortcut-badge { display: none; } }
+        @media (max-width: 800px) { .app-shell { width: min(660px, 100%); padding: 20px; } .app-header { margin-bottom: 22px; padding-bottom: 20px; } .edition-label { display: none; } .workspace { grid-template-columns: minmax(0, 1fr); gap: 22px; } .machine-panel { grid-row: 1; } .model-options { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .model-image-wrap { height: 112px; } .section-description { margin-bottom: 13px; } .rom-manual { margin-top: 12px; padding-top: 8px; } .rom-manual .btn { width: auto; } .display-toolbar .shortcut-badge { display: inline; } .keyboard-help { gap: 10px; } }
+        @media (max-width: 440px) { .app-shell { padding: 20px 14px; } h1 { font-size: 21px; } .brand { gap: 12px; } .header-actions { gap: 0; } .brand p { font-size: 10px; } .header-actions .btn { padding: 8px; min-height: 36px; font-size: 11px; } .model-choice { padding: 12px 12px 0; } .model-name { font-size: 11px; } .model-memory { font-size: 9px; } .model-detail { font-size: 9px; } .model-image-wrap { height: 100px; padding: 10px 0 6px; } .model-action { width: calc(100% + 24px); margin: 0 -12px; padding: 10px 12px; font-size: 10px; } .model-options { gap: 9px; } .display-heading { padding: 0 14px; height: 43px; } .display-spec { font-size: 9px; } .display-stage { padding: 10px 10px 17px; } .display-toolbar .btn { padding: 8px 7px; gap: 5px; } .display-toolbar .shortcut-badge { display: none; } .screen-idle .idle-cursor { margin-bottom: 15px; width: 27px; height: 32px; font-size: 23px; } .screen-idle .eyebrow { font-size: 8px; } .screen-idle h2 { margin: 9px 0 6px; } .screen-idle p:last-child { font-size: 10px; } .tape-deck { padding: 16px; } .tape-controls .btn { padding-inline: 10px; font-size: 11px; } .keyboard-help { gap: 7px 12px; font-size: 9px; } .app-footer { margin-top: 22px; } }
+        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
+        @media (max-width: 440px) {
+            .display-toolbar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; }
+            .display-toolbar .btn { justify-content: flex-start; min-height: 36px; }
+            .audio-toggle { margin-left: 0; }
         }
     </style>
 
@@ -506,106 +157,114 @@
     </script>
 </head>
 <body>
-
-    <div class="header"><h1>JS Spectrum</h1></div>
-
-    <div class="monitor-frame" id="monitor">
-        <div class="canvas-wrapper" id="container" tabindex="0">
-            <canvas id="screen" width="256" height="192"></canvas>
-            <div id="keyboardOverlay" class="overlay">
-                <img src="keyboard.jpg" alt="ZX Spectrum Keyboard">
-                <div class="overlay-hint">Press <b>F1</b> to close</div>
+    <div class="app-shell">
+        <header class="app-header">
+            <div class="brand">
+                <span class="spectrum-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+                <div><h1>JS Spectrum</h1><p>Your Spectrum, in the browser.</p></div>
             </div>
-        </div>
+            <div class="header-actions">
+                <span class="edition-label">48K / 128K</span>
+                <button id="btnAbout" class="btn quiet" type="button" aria-haspopup="dialog">About <svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.3"/><path d="M10 9v5m0-8v.2"/></svg></button>
+            </div>
+        </header>
+
+        <main class="workspace">
+            <section class="player-column" aria-label="Emulator">
+                <div class="display-panel">
+                    <div class="display-heading">
+                        <span class="display-label"><i class="status-dot" aria-hidden="true"></i><span id="runState">DISPLAY / STANDBY</span></span>
+                        <span class="display-spec">256 &times; 192 &middot; 50 Hz</span>
+                    </div>
+                    <div class="display-stage">
+                        <div class="monitor-frame" id="monitor">
+                            <div class="canvas-wrapper" id="container" tabindex="0" role="group" aria-label="Spectrum display. Click here to use your keyboard." aria-describedby="keyboardHelp">
+                                <canvas id="screen" width="256" height="192" aria-label="ZX Spectrum screen"></canvas>
+                                <div id="screenIdle" class="screen-idle">
+                                    <span class="idle-cursor" aria-hidden="true">K</span>
+                                    <p class="eyebrow">READY WHEN YOU ARE</p>
+                                    <h2>A classic is waiting.</h2>
+                                    <p>Choose your Spectrum to power on.</p>
+                                </div>
+                                <div id="keyboardOverlay" class="overlay" hidden>
+                                    <img src="keyboard.jpg" alt="ZX Spectrum keyboard map showing the BASIC keywords and symbols on each key">
+                                    <button type="button" class="btn quiet overlay-hint" onclick="toggleKeyboard()">Close keyboard map <span class="shortcut-badge">F1</span></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="display-toolbar" role="group" aria-label="Display and audio controls">
+                        <button id="btnKeyboard" class="btn quiet" type="button" onclick="toggleKeyboard()" aria-pressed="false" title="Keyboard map (F1)"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="4" width="16" height="12" rx="2"/><path d="M5 7h.1m3 0h.1m3 0h.1m3 0h.1M5 10h.1m3 0h.1m3 0h.1m3 0h.1M6 13h8"/></svg>Keyboard <span class="shortcut-badge">F1</span></button>
+                        <button id="btnLargeView" class="btn quiet" type="button" aria-pressed="false" title="Toggle large view (F3)"></button>
+                        <button id="btnFullscreen" class="btn quiet" type="button" onclick="toggleFullscreen()" title="Fullscreen (F2)"></button>
+                        <button class="btn quiet audio-toggle" id="btnAudio" type="button" aria-pressed="true" aria-label="Mute audio">
+                            <svg class="audio-icon" viewBox="0 0 20 20" aria-hidden="true"></svg><span id="audioButtonLabel">Audio on</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="status-bar" role="status" aria-live="polite" aria-atomic="true"><i class="status-dot" aria-hidden="true"></i><span id="statusMsg">Choose a Spectrum model to start.</span></div>
+
+                <section class="tape-deck" id="tapeDeck" aria-labelledby="tapeTitle">
+                    <div class="deck-heading">
+                        <svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="4" width="16" height="12" rx="2"/><circle cx="6.5" cy="9" r="1.5"/><circle cx="13.5" cy="9" r="1.5"/><path d="m5 16 2-4h6l2 4M8 9h4"/></svg>
+                        <h2 id="tapeTitle">Tape deck</h2><span class="file-type">.TAP FILES</span>
+                    </div>
+                    <div class="tape-controls">
+                        <button class="btn primary" id="btnLoadTape" type="button" disabled onclick="document.getElementById('tapFile').click()"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 13V3m-4 4 4-4 4 4M3 12v5h14v-5"/></svg>Load tape</button>
+                        <input type="file" id="tapFile" disabled accept=".tap,.TAP" aria-label="Choose a TAP tape file">
+                        <button id="btnSamples" class="btn" type="button" disabled aria-expanded="false" aria-haspopup="dialog" aria-controls="samplesMenu"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M2 6V4h6l2 2h8v10H2V6Z"/></svg>Sample games</button>
+                        <button id="btnReset" class="btn quiet" type="button" disabled title="Restart the current Spectrum"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 7a6.5 6.5 0 1 1-1 5M4 3v4h4"/></svg>Reset</button>
+                    </div>
+                    <div class="tape-info"><i class="status-dot" aria-hidden="true"></i><span id="tapeName">No tape inserted</span></div>
+                    <p class="deck-hint" id="tapeLoadHint">Load or drop a tape here, then type <code>LOAD &quot;&quot;</code> and press Enter.</p>
+                </section>
+            </section>
+
+            <aside class="machine-panel" aria-labelledby="machineTitle">
+                <div class="section-heading"><h2 id="machineTitle">Choose your Spectrum</h2><span class="section-index">2 MODELS</span></div>
+                <p class="section-description">Two machines. A world of possibilities.</p>
+                <div class="model-options" role="group" aria-label="Spectrum models">
+                    <button class="model-choice" id="btnLoad48" type="button" aria-label="Start the 48K ZX Spectrum" aria-pressed="false">
+                        <span class="model-title"><span class="model-name">ZX Spectrum+</span><span class="model-memory">48K</span></span>
+                        <span class="model-detail">The original experience</span>
+                        <span class="model-image-wrap"><img class="model-icon" src="assets/spectrum-48k.png" alt="" width="1553" height="1013" decoding="async"></span>
+                        <span class="model-action"><span class="model-action-label">Start 48K</span><svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 10h13m-5-5 5 5-5 5"/></svg></span>
+                    </button>
+                    <button class="model-choice" id="btnLoad128" type="button" aria-label="Start the 128K ZX Spectrum" aria-pressed="false">
+                        <span class="model-title"><span class="model-name">ZX Spectrum 128</span><span class="model-memory">128K</span></span>
+                        <span class="model-detail">The iconic toastrack</span>
+                        <span class="model-image-wrap"><img class="model-icon" src="assets/spectrum-128k.png" alt="" width="1802" height="872" decoding="async"></span>
+                        <span class="model-action"><span class="model-action-label">Start 128K</span><svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 10h13m-5-5 5 5-5 5"/></svg></span>
+                    </button>
+                </div>
+                <details class="rom-manual">
+                    <summary>Use your own ROM</summary>
+                    <p>Select one 16 KB ROM for 48K, or both ROMs for 128K. ROM and ZIP files are supported.</p>
+                    <button class="btn" type="button" onclick="document.getElementById('romFile').click()">Choose ROM files</button>
+                    <input type="file" id="romFile" multiple accept=".rom,.zip" aria-label="Choose custom ROM files">
+                </details>
+            </aside>
+        </main>
+
+        <footer class="app-footer">
+            <div class="keyboard-help" id="keyboardHelp"><span><kbd>Ctrl</kbd> Caps Shift</span><span><kbd>Shift</kbd> Symbol Shift</span><span><kbd>&larr; &uarr; &darr; &rarr;</kbd> Cursor keys</span></div>
+            <span class="focus-hint" id="focusHint"><i class="status-dot" aria-hidden="true"></i>Click the display to type</span>
+        </footer>
     </div>
 
-    <div class="status-bar"><span id="statusMsg">Choose a Spectrum model to start.</span></div>
-
-    <div class="controls-wrap">
-        <div class="controls-panel">
-            <div class="control-group core">
-                <button class="btn primary model-choice" id="btnLoad48" type="button" aria-label="Start the 48K ZX Spectrum">
-                    <svg class="model-icon" viewBox="0 0 100 58" role="img" aria-label="ZX Spectrum 48K">
-                        <path d="M8 13 73 7l19 8v33l-19 6-65-7z" fill="#17191a" stroke="#74787a" stroke-width="1.5"/>
-                        <path d="m13 16 58-5 13 5v6l-13-5-58 5z" fill="#26292a"/>
-                        <path d="m16 27 52-5 12 4v15l-12 5-52-5z" fill="#202324" stroke="#4a4e50" stroke-width="1"/>
-                        <g fill="#82888a">
-                            <path d="m21 29 5-.5v3l-5 .5zm8-.8 5-.5v3l-5 .5zm8-.8 5-.5v3l-5 .5zm8-.8 5-.5v3l-5 .5zm8-.8 5-.5v3l-5 .5zm8-.8 5-.5v3l-5 .5z"/>
-                            <path d="m20 35 5 .4v3l-5-.4zm8 .6 5 .4v3l-5-.4zm8 .6 5 .4v3l-5-.4zm8 .6 5 .4v3l-5-.4zm8 .6 5 .4v3l-5-.4zm8 .6 5 .4v3l-5-.4z"/>
-                        </g>
-                        <path d="m16 23 10-1v1l-10 1z" fill="#e52b26"/>
-                        <path d="m27 22 10-1v1l-10 1z" fill="#f3d529"/>
-                        <path d="m38 21 10-1v1l-10 1z" fill="#24a85a"/>
-                        <path d="m49 20 10-1v1l-10 1z" fill="#268dd0"/>
-                        <path d="m60 19 10-1v1l-10 1z" fill="#c94d9d"/>
-                    </svg>
-                    <span class="model-name">48K Spectrum</span>
-                    <span class="model-detail">The original classic</span>
-                </button>
-                <button class="btn primary model-choice" id="btnLoad128" type="button" aria-label="Start the 128K ZX Spectrum">
-                    <svg class="model-icon" viewBox="0 0 100 58" role="img" aria-label="ZX Spectrum 128K toastrack">
-                        <path d="M8 13 75 7l17 8v33l-17 6-67-7z" fill="#252729" stroke="#858a8d" stroke-width="1.5"/>
-                        <path d="m13 17 58-5 14 5v5l-14-5-58 5z" fill="#333638"/>
-                        <path d="m16 27 48-5 10 3v15l-10 5-48-5z" fill="#1c1e1f" stroke="#4e5356" stroke-width="1"/>
-                        <g fill="#858b8e">
-                            <path d="m20 29 4-.4v3l-4 .4zm7-.7 4-.4v3l-4 .4zm7-.7 4-.4v3l-4 .4zm7-.7 4-.4v3l-4 .4zm7-.7 4-.4v3l-4 .4zm7-.7 4-.4v3l-4 .4z"/>
-                            <path d="m20 35 4 .3v3l-4-.3zm7 .5 4 .3v3l-4-.3zm7 .5 4 .3v3l-4-.3zm7 .5 4 .3v3l-4-.3zm7 .5 4 .3v3l-4-.3zm7 .5 4 .3v3l-4-.3z"/>
-                        </g>
-                        <path d="M70 25h13v17l-13 4z" fill="#181a1b" stroke="#555a5d" stroke-width="1"/>
-                        <path d="M73 28h7v2h-7zm0 4h7v2h-7zm0 4h7v2h-7z" fill="#898f91"/>
-                        <path d="M73 12h1v10h-1zm3-.3h1v10h-1zm3-.3h1v10h-1zm3-.3h1v10h-1zm3-.3h1v10h-1z" fill="#686e71"/>
-                        <path d="m16 23 10-1v1l-10 1z" fill="#e52b26"/>
-                        <path d="m27 22 10-1v1l-10 1z" fill="#f3d529"/>
-                        <path d="m38 21 10-1v1l-10 1z" fill="#24a85a"/>
-                        <path d="m49 20 10-1v1l-10 1z" fill="#268dd0"/>
-                        <path d="m60 19 8-1v1l-8 1z" fill="#c94d9d"/>
-                    </svg>
-                    <span class="model-name">128K Toastrack</span>
-                    <span class="model-detail">The 128K classic</span>
-                </button>
-                <button class="btn audio-toggle" id="btnAudio" type="button" aria-pressed="true" aria-label="Mute audio">
-                    <svg class="audio-icon" viewBox="0 0 20 20" aria-hidden="true">
-                        <path d="M3 8v4h3l4 3V5L6 8H3z" fill="currentColor"/>
-                        <path d="M13 7a4 4 0 0 1 0 6m2-8a7 7 0 0 1 0 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-                    </svg>
-                    <span id="audioButtonLabel">Audio on</span>
-                </button>
-                <label class="btn">Load Tape<input type="file" id="tapFile" disabled accept=".tap,.TAP"></label>
-                <button id="btnSamples" class="btn" type="button" disabled aria-expanded="false">Samples</button>
-                <button id="btnReset" class="btn" type="button" disabled>Reset</button>
-            </div>
-            <div class="control-group display">
-                <button id="btnLargeView" class="btn view" type="button"></button>
-                <button id="btnFullscreen" class="btn view" type="button" onclick="toggleFullscreen()">Fullscreen</button>
-                <button class="btn" type="button" onclick="toggleKeyboard()"><span class="shortcut-badge">F1</span> Keyboard Map</button>
-            </div>
-            <div class="control-group meta">
-                <button id="btnAbout" class="btn meta" type="button">About</button>
-            </div>
-        </div>
-        <details class="rom-manual">
-            <summary>Load custom ROM files</summary>
-            <label class="btn">Choose ROM file(s)<input type="file" id="romFile" multiple accept=".rom,.zip"></label>
-        </details>
-        <div id="samplesMenu" class="samples-menu" aria-hidden="true">
-            <div class="samples-menu-title">Tape Samples</div>
-            <div class="samples-menu-accent"></div>
-            <label class="samples-label" for="sampleSelect">Select a bundled TAP game:</label>
+    <div id="samplesMenu" class="samples-menu" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="samplesTitle">
+        <div class="dialog-card">
+            <div class="dialog-heading"><h2 id="samplesTitle" class="samples-menu-title">A few classics to get you started.</h2><button id="btnSamplesClose" class="btn quiet" type="button" aria-label="Close sample games">&times;</button></div>
+            <label class="samples-label" for="sampleSelect">Choose a bundled tape to insert:</label>
             <select id="sampleSelect" class="samples-select"></select>
-            <div class="samples-meta">
-                <p class="samples-hint">After selecting, type <b>LOAD ""</b> and press Enter on the Spectrum prompt.</p>
-                <button id="btnSamplesClose" class="samples-close" type="button">Close</button>
-            </div>
+            <p class="samples-hint">Once inserted, type <code>LOAD &quot;&quot;</code> and press Enter on your Spectrum. On 48K, press <kbd>J</kbd> for LOAD, then <kbd>Shift</kbd> + <kbd>P</kbd> twice for the quotes.</p>
+            <p id="sample128Hint" class="samples-hint" hidden>On the 128K model, choose <b>48 BASIC</b> from the Spectrum menu before loading a tape.</p>
         </div>
     </div>
-    
-    <div class="keyboard-help" style="font-size: 12px; color: #555;">
-        PC <b>Ctrl</b> = Caps Shift &nbsp;|&nbsp; PC <b>Shift</b> = Symbol Shift &nbsp;|&nbsp; <b>Arrow keys</b> = Spectrum cursor keys
-    </div>
-    <div id="aboutModal" class="about-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
-        <div class="about-card">
+    <div id="aboutModal" class="about-modal" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
+        <div class="dialog-card about-card">
             <h2 id="aboutTitle" class="about-title">About This Emulator</h2>
-            <div class="about-accent"></div>
+
             <p><b>Author:</b> Luis Cunha, 2026.</p>
             <p>This project is distributed under the <b>MIT License</b>.</p>
             <p><b>Z80 microprocessor emulator core (`Z80.js`):</b> Copyright (c) <b>Molly Howell</b>.</p>
@@ -620,7 +279,7 @@
                     https://www.youtube.com/watch?v=zzWyqmLdeS8
                 </a>
             </p>
-            <button id="btnAboutClose" class="about-close" type="button">Close</button>
+            <button id="btnAboutClose" class="btn about-close" type="button">Close</button>
         </div>
     </div>
 
@@ -664,7 +323,7 @@ let audioUnavailable = false;
 let nextAudioTime = 0;
 const AUDIO_SAMPLE_RATE = 44100;
 const T_STATES_PER_FRAME = 70000;
-let speakerLog = []; 
+let speakerLog = [];
 let lastSpeakerState = 0;
 
 function enableAudio() {
@@ -717,7 +376,7 @@ function processAudioFrame(log) {
     if (!audioCtx) return;
 
     // Buffer size = 1 frame @ 50Hz = 0.02s
-    const sampleCount = Math.floor(AUDIO_SAMPLE_RATE / 50); 
+    const sampleCount = Math.floor(AUDIO_SAMPLE_RATE / 50);
     const buffer = audioCtx.createBuffer(1, sampleCount, AUDIO_SAMPLE_RATE);
     const data = buffer.getChannelData(0);
 
@@ -738,9 +397,9 @@ function processAudioFrame(log) {
     source.buffer = buffer;
     source.connect(audioGain);
 
-    // Tight Sync: If we fell behind, jump to now. 
+    // Tight Sync: If we fell behind, jump to now.
     if (nextAudioTime < audioCtx.currentTime) nextAudioTime = audioCtx.currentTime;
-    
+
     source.start(nextAudioTime);
     nextAudioTime += buffer.duration;
 }
@@ -751,8 +410,6 @@ const keyboard = { 0xFEFE: 0x1F, 0xFDFE: 0x1F, 0xFBFE: 0x1F, 0xF7FE: 0x1F, 0xEFF
 const SCREEN_WIDTH = 256;
 const SCREEN_HEIGHT = 192;
 const DEFAULT_SCREEN_SCALE = 2;
-const WINDOWED_WIDTH_MARGIN = 60;
-const WINDOWED_HEIGHT_MARGIN = 320;
 const canvas = document.getElementById('screen');
 const ctx = canvas.getContext('2d');
 const imgData = ctx.createImageData(SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -772,8 +429,21 @@ let sampleCatalog = [];
 let displayMode = 'default';
 
 function updateModelSelection() {
-    document.getElementById('btnLoad48').classList.toggle('is-selected', machineModel === '48K' && !!z80);
-    document.getElementById('btnLoad128').classList.toggle('is-selected', machineModel === '128K' && !!z80);
+    for (const [id, model] of [['btnLoad48', '48K'], ['btnLoad128', '128K']]) {
+        const button = document.getElementById(id);
+        const selected = machineModel === model && !!z80;
+        button.classList.toggle('is-selected', selected);
+        button.setAttribute('aria-pressed', String(selected));
+        button.querySelector('.model-action-label').textContent = selected ? 'Running' : `Start ${model}`;
+        button.setAttribute('aria-label', selected ? `Restart the ${model} ZX Spectrum` : `Start the ${model} ZX Spectrum`);
+    }
+    document.body.classList.toggle('is-running', !!z80);
+    document.getElementById('screenIdle').hidden = !!z80;
+    document.getElementById('runState').textContent = z80 ? `${machineModel} / RUNNING` : 'DISPLAY / STANDBY';
+    document.getElementById('tapeLoadHint').innerHTML = machineModel === '128K'
+        ? 'Insert a tape, choose <b>48 BASIC</b> in the Spectrum menu, then type <code>LOAD &quot;&quot;</code> and press Enter.'
+        : 'Load or drop a tape here, then type <code>LOAD &quot;&quot;</code> and press Enter.';
+    document.getElementById('sample128Hint').hidden = machineModel !== '128K';
 }
 
 function getFullscreenElement() {
@@ -786,30 +456,31 @@ function setDisplayScale(scale) {
 }
 
 function getMaxWindowedScale() {
-    const targetWidth = Math.max(SCREEN_WIDTH, (window.innerWidth || SCREEN_WIDTH) - WINDOWED_WIDTH_MARGIN);
-    const targetHeight = Math.max(SCREEN_HEIGHT, (window.innerHeight || SCREEN_HEIGHT) - WINDOWED_HEIGHT_MARGIN);
-    const maxScale = Math.floor(Math.min(targetWidth / SCREEN_WIDTH, targetHeight / SCREEN_HEIGHT));
-    return Math.max(1, maxScale);
+    const stage = document.querySelector('.display-stage');
+    const style = getComputedStyle(stage);
+    const targetWidth = stage.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) - 16;
+    return Math.max(0.1, targetWidth / SCREEN_WIDTH);
 }
 
 function getLargeWindowedScale() {
-    const maxScale = getMaxWindowedScale();
-    if (maxScale <= DEFAULT_SCREEN_SCALE) return DEFAULT_SCREEN_SCALE;
-    const midpointScale = Math.floor((DEFAULT_SCREEN_SCALE + maxScale) / 2);
-    return Math.max(DEFAULT_SCREEN_SCALE + 1, midpointScale);
+    const widthScale = getMaxWindowedScale();
+    const heightScale = Math.max(DEFAULT_SCREEN_SCALE, Math.floor((window.innerHeight - 220) / SCREEN_HEIGHT));
+    const integerScale = Math.floor(Math.min(widthScale, heightScale));
+    return widthScale < 1 ? widthScale : Math.max(1, integerScale);
 }
 
 function updateLargeViewButton() {
     const isLargeMode = displayMode === 'large';
     btnLargeView.classList.toggle('toggle-active', isLargeMode);
-    btnLargeView.innerHTML = `<span class="shortcut-badge">F3</span> ${isLargeMode ? 'Normal View' : 'Large View'}`;
+    btnLargeView.setAttribute('aria-pressed', String(isLargeMode));
+    btnLargeView.innerHTML = `<svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="3" width="16" height="14" rx="1.5"/><path d="M2 7h16"/></svg>${isLargeMode ? 'Normal view' : 'Large view'} <span class="shortcut-badge">F3</span>`;
 }
 
 function updateLargeViewButtonState(isFullscreenActive) {
     if (isFullscreenActive) {
         btnLargeView.disabled = true;
         btnLargeView.classList.remove('toggle-active');
-        btnLargeView.innerHTML = '<span class="shortcut-badge">F3</span> Large View';
+        btnLargeView.setAttribute('aria-pressed', 'false');
         return;
     }
 
@@ -820,6 +491,7 @@ function updateLargeViewButtonState(isFullscreenActive) {
 function toggleLargeView() {
     if (getFullscreenElement() === monitor) return;
     displayMode = (displayMode === 'large') ? 'default' : 'large';
+    document.body.classList.toggle('is-large', displayMode === 'large');
     updateLargeViewButton();
     syncDisplayScale();
     container.focus();
@@ -830,9 +502,10 @@ function syncDisplayScale() {
         const targetWidth = monitor.clientWidth || window.innerWidth;
         const targetHeight = monitor.clientHeight || window.innerHeight;
         const maxScale = Math.floor(Math.min(targetWidth / SCREEN_WIDTH, targetHeight / SCREEN_HEIGHT));
-        setDisplayScale(Math.max(1, maxScale));
+        setDisplayScale(maxScale >= 1 ? maxScale : Math.min(targetWidth / SCREEN_WIDTH, targetHeight / SCREEN_HEIGHT));
     } else {
-        const nextScale = (displayMode === 'large') ? getLargeWindowedScale() : DEFAULT_SCREEN_SCALE;
+        const fitScale = getMaxWindowedScale();
+        const nextScale = displayMode === 'large' ? getLargeWindowedScale() : Math.min(DEFAULT_SCREEN_SCALE, fitScale);
         setDisplayScale(nextScale);
     }
 }
@@ -853,25 +526,32 @@ async function toggleFullscreen() {
 
 function toggleKeyboard() {
     const overlay = document.getElementById('keyboardOverlay');
-    overlay.classList.toggle('active');
-    if (!overlay.classList.contains('active')) container.focus();
+    overlay.hidden = !overlay.hidden;
+    document.getElementById('btnKeyboard').setAttribute('aria-pressed', String(!overlay.hidden));
+    releaseAllKeys();
+    if (overlay.hidden) container.focus();
+    else overlay.querySelector('button').focus();
 }
 
 function openAbout() {
+    releaseAllKeys();
+    aboutModal.hidden = false;
     aboutModal.classList.add('active');
     aboutModal.setAttribute('aria-hidden', 'false');
+    btnAboutClose.focus();
 }
 
 function closeAbout() {
     aboutModal.classList.remove('active');
     aboutModal.setAttribute('aria-hidden', 'true');
-    container.focus();
+    aboutModal.hidden = true;
+    btnAbout.focus();
 }
 
 function log(msg, type) {
     const el = document.getElementById('statusMsg');
     el.innerText = msg;
-    el.style.color = type === 'error' ? '#ff4444' : (type === 'success' ? '#00cc00' : '#888');
+    el.parentElement.dataset.tone = type || 'normal';
 }
 
 function getRamBankForAddress(addr) {
@@ -1085,7 +765,11 @@ function isTapFileName(fileName) {
 function setTapeBuffer(arrayBuffer, sourceLabel = 'Tape') {
     tapeBuffer = arrayBuffer;
     tapeIndex = 0;
-    log(`${sourceLabel} loaded. Type LOAD "" and press Enter.`, 'success');
+    document.getElementById('tapeName').textContent = sourceLabel;
+    document.getElementById('tapeName').title = sourceLabel;
+    document.getElementById('tapeDeck').classList.add('has-tape');
+    const loadHint = machineModel === '128K' ? 'Use 48 BASIC, then type LOAD "" and press Enter.' : 'Type LOAD "" and press Enter.';
+    log(`${sourceLabel} loaded. ${loadHint}`, 'success');
 }
 
 function getSampleCatalog() {
@@ -1152,6 +836,8 @@ function renderSamplesMenu() {
 
 function openSamplesMenu() {
     renderSamplesMenu();
+    releaseAllKeys();
+    samplesMenu.hidden = false;
     samplesMenu.classList.add('active');
     samplesMenu.setAttribute('aria-hidden', 'false');
     btnSamples.setAttribute('aria-expanded', 'true');
@@ -1162,6 +848,7 @@ function closeSamplesMenu() {
     samplesMenu.classList.remove('active');
     samplesMenu.setAttribute('aria-hidden', 'true');
     btnSamples.setAttribute('aria-expanded', 'false');
+    samplesMenu.hidden = true;
 }
 
 function toggleSamplesMenu() {
@@ -1202,7 +889,7 @@ function initZ80() {
                 const speaker = (val & 0x10) ? 1 : 0;
                 speakerLog.push({ t: frameTStates, val: speaker });
                 const colorIdx = val & 7;
-                monitor.style.boxShadow = `0 0 0 4px ${PALETTE_HEX[colorIdx]}, 0 30px 60px rgba(0,0,0,0.8)`;
+                monitor.style.borderColor = PALETTE_HEX[colorIdx];
             }
         }
     });
@@ -1211,6 +898,7 @@ function initZ80() {
     updateModelSelection();
     document.getElementById('btnReset').disabled = false;
     document.getElementById('tapFile').disabled = false;
+    document.getElementById('btnLoadTape').disabled = false;
     document.getElementById('btnSamples').disabled = false;
     resetSystem();
 }
@@ -1224,12 +912,12 @@ function resetSystem() {
     isRunning = true;
     if(animationFrameId) cancelAnimationFrame(animationFrameId);
     container.focus();
-    monitor.style.boxShadow = `0 0 0 4px #333, 0 30px 60px rgba(0,0,0,0.8)`;
+    monitor.style.borderColor = '#333a36';
     loop();
-    log("Reset. Type LOAD \"\" and press Enter.", 'normal');
+    log(machineModel === '128K' ? '128K ready. For tapes, choose 48 BASIC from the Spectrum menu.' : '48K ready. Load a tape or start typing.', 'normal');
 }
 
-let frameTStates = 0; 
+let frameTStates = 0;
 
 function loop() {
     if (!isRunning) return;
@@ -1243,17 +931,17 @@ function loop() {
         return;
     }
 
-    frameTStates = 0; 
-    speakerLog = [];  
+    frameTStates = 0;
+    speakerLog = [];
 
     while (frameTStates < T_STATES_PER_FRAME) {
         if (z80.getState().pc === 0x0556 && tapeBuffer && (machineModel === '48K' || ((pagingLatch >> 4) & 1) === 1)) {
             handleTapeLoad();
-            continue; 
+            continue;
         }
         frameTStates += z80.run_instruction();
     }
-    
+
     z80.interrupt(false, 0);
     renderScreen();
     processAudioFrame(speakerLog);
@@ -1283,18 +971,18 @@ function handleTapeLoad() {
 
     let destAddr = state.ix;
     let reqLen = (state.d << 8) | state.e; // Fix undefined DE
-    
+
     const bytesToCopy = (payloadLen < reqLen) ? payloadLen : reqLen;
     for (let i = 0; i < bytesToCopy; i++) {
         writeMemory((destAddr + i) & 0xFFFF, view.getUint8(dataPtr + i));
     }
-    
+
     state.ix += bytesToCopy;
     let newDE = reqLen - bytesToCopy;
     if(newDE < 0) newDE = 0;
     state.d = (newDE >> 8) & 0xFF;
     state.e = newDE & 0xFF;
-    state.a = flagByte; 
+    state.a = flagByte;
 
     tapeIndex += blockLen + 2;
 
@@ -1411,6 +1099,8 @@ window.addEventListener('keydown', (e) => {
     if (e.key === 'F1') { e.preventDefault(); toggleKeyboard(); return; }
     if (e.key === 'F2') { e.preventDefault(); toggleFullscreen(); return; }
     if (e.key === 'F3') { e.preventDefault(); toggleLargeView(); return; }
+    if (e.key === 'Escape' && !document.getElementById('keyboardOverlay').hidden) { e.preventDefault(); toggleKeyboard(); return; }
+    if (document.activeElement !== container || !z80) return;
     const cursorKey = resolveSpectrumCursorKey(e);
     if (cursorKey) {
         cursorKeysPressed.add(e.code || e.key);
@@ -1423,6 +1113,7 @@ window.addEventListener('keydown', (e) => {
     if (k) { keyboard[k[0]] &= ~k[1]; e.preventDefault(); }
 });
 window.addEventListener('keyup', (e) => {
+    if (document.activeElement !== container) return;
     const cursorKey = resolveSpectrumCursorKey(e);
     if (cursorKey) {
         keyboard[cursorKey[0]] |= cursorKey[1];
@@ -1438,6 +1129,13 @@ window.addEventListener('keyup', (e) => {
 });
 window.addEventListener('blur', releaseAllKeys);
 container.addEventListener('pointerdown', () => container.focus());
+container.addEventListener('blur', releaseAllKeys);
+container.addEventListener('focus', () => {
+    document.getElementById('focusHint').lastChild.textContent = 'Keyboard connected';
+});
+container.addEventListener('blur', () => {
+    document.getElementById('focusHint').lastChild.textContent = 'Click the display to type';
+});
 document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAllKeys(); });
 
 document.getElementById('romFile').addEventListener('change', (e) => {
@@ -1462,22 +1160,46 @@ document.getElementById('btnLoad48').addEventListener('click', () => loadBuiltIn
 document.getElementById('btnLoad128').addEventListener('click', () => loadBuiltInModel('128K'));
 document.getElementById('tapFile').addEventListener('change', (e) => {
     const file = e.target.files && e.target.files[0];
+    loadTapeFile(file);
+    e.target.value = '';
+});
+
+function loadTapeFile(file) {
     if (!file) return;
+    if (!z80) { log('Start a Spectrum model before loading a tape.', 'error'); return; }
     if (!isTapFileName(file.name)) {
         log(TAP_ONLY_MSG, 'error');
-        alert(TAP_ONLY_MSG);
-        e.target.value = '';
         return;
     }
 
     const r = new FileReader();
-    r.onload = (ev) => { setTapeBuffer(ev.target.result); };
+    r.onload = (ev) => { setTapeBuffer(ev.target.result, file.name); container.focus(); };
+    r.onerror = () => log(`Could not read ${file.name}. Try choosing the file again.`, 'error');
     r.readAsArrayBuffer(file);
+}
+
+const tapeDeck = document.getElementById('tapeDeck');
+tapeDeck.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    if (z80) tapeDeck.classList.add('is-dragging');
 });
+tapeDeck.addEventListener('dragleave', (e) => {
+    if (!tapeDeck.contains(e.relatedTarget)) tapeDeck.classList.remove('is-dragging');
+});
+tapeDeck.addEventListener('drop', (e) => {
+    e.preventDefault();
+    tapeDeck.classList.remove('is-dragging');
+    loadTapeFile(e.dataTransfer.files[0]);
+});
+
+function updateFullscreenButton(active) {
+    btnFullscreen.innerHTML = `<svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M7 2H2v5m11-5h5v5M2 13v5h5m11-5v5h-5"/></svg>${active ? 'Windowed' : 'Fullscreen'} <span class="shortcut-badge">F2</span>`;
+    btnFullscreen.setAttribute('aria-pressed', String(active));
+}
 function handleFullscreenStateChanged() {
     const active = getFullscreenElement() === monitor;
     monitor.classList.toggle('is-fullscreen', active);
-    btnFullscreen.innerHTML = active ? '<span class="shortcut-badge">F2</span> Windowed' : '<span class="shortcut-badge">F2</span> Fullscreen';
+    updateFullscreenButton(active);
     updateLargeViewButtonState(active);
     syncDisplayScale();
     container.focus();
@@ -1486,7 +1208,7 @@ document.addEventListener('fullscreenchange', handleFullscreenStateChanged);
 document.addEventListener('webkitfullscreenchange', handleFullscreenStateChanged);
 window.addEventListener('resize', syncDisplayScale);
 monitor.classList.remove('is-fullscreen');
-btnFullscreen.innerHTML = '<span class="shortcut-badge">F2</span> Fullscreen';
+updateFullscreenButton(false);
 updateLargeViewButtonState(false);
 syncDisplayScale();
 document.getElementById('btnReset').addEventListener('click', resetSystem);
@@ -1511,18 +1233,29 @@ aboutModal.addEventListener('click', (e) => {
     if (e.target === aboutModal) closeAbout();
 });
 sampleSelect.addEventListener('change', handleSampleSelection);
-samplesMenu.addEventListener('click', (e) => e.stopPropagation());
+samplesMenu.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (e.target === samplesMenu) { closeSamplesMenu(); btnSamples.focus(); }
+});
 document.addEventListener('click', () => {
     if (samplesMenu.classList.contains('active')) closeSamplesMenu();
 });
 document.addEventListener('keydown', (e) => {
+    const dialog = !aboutModal.hidden ? aboutModal : (!samplesMenu.hidden ? samplesMenu : null);
+    if (dialog && e.key === 'Tab') {
+        const focusable = [...dialog.querySelectorAll('button:not(:disabled), a[href], select:not(:disabled)')];
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
     if (e.key === 'Escape' && aboutModal.classList.contains('active')) {
         closeAbout();
         return;
     }
     if (e.key === 'Escape' && samplesMenu.classList.contains('active')) {
         closeSamplesMenu();
-        container.focus();
+        btnSamples.focus();
     }
 });
 updateAudioButton();
