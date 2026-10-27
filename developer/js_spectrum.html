@@ -255,10 +255,11 @@
     <div id="samplesMenu" class="samples-menu" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="samplesTitle">
         <div class="dialog-card">
             <div class="dialog-heading"><h2 id="samplesTitle" class="samples-menu-title">A few classics to get you started.</h2><button id="btnSamplesClose" class="btn quiet" type="button" aria-label="Close sample games">&times;</button></div>
-            <label class="samples-label" for="sampleSelect">Choose a bundled tape to insert:</label>
+            <label class="samples-label" for="sampleSelect">Choose a bundled game to insert:</label>
             <select id="sampleSelect" class="samples-select"></select>
             <p class="samples-hint">Once inserted, type <code>LOAD &quot;&quot;</code> and press Enter on your Spectrum. On 48K, press <kbd>J</kbd> for LOAD, then <kbd>Shift</kbd> + <kbd>P</kbd> twice for the quotes.</p>
-            <p id="sample128Hint" class="samples-hint" hidden>On the 128K model, choose <b>48 BASIC</b> from the Spectrum menu before loading a tape.</p>
+            <p id="sample128Hint" class="samples-hint" hidden>On the 128K model, select <b>Tape Loader</b> from the Spectrum menu to start loading.</p>
+            <p class="samples-hint">128K picks switch to the 128K model if needed. When changing games, reset before loading. If a title screen pauses, press <kbd>Space</kbd> to continue.</p>
         </div>
     </div>
     <div id="aboutModal" class="about-modal" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
@@ -309,9 +310,19 @@ let tapeIndex = 0;
 let animationFrameId;
 const TAP_ONLY_MSG = 'Only TAP files are supported for now.';
 const DEFAULT_SAMPLE_TAPS = [
-    { name: 'GALAXINS.TAP', path: 'TAPs/GALAXINS.TAP' },
-    { name: 'Night Sky, The (1983)(Bridge Software).tap', path: 'TAPs/Night Sky, The (1983)(Bridge Software).tap' },
-    { name: 'tetris_release.tap', path: 'TAPs/tetris_release.tap' }
+    { name: 'EXOLON', path: 'TAPs/Exolon (1987)(Hewson)(48K-128K).tap', group: '128K favourites', model: '128K' },
+    { name: 'RoboCop', path: 'TAPs/RoboCop (1988)(Ocean)(48K-128K).tap', group: '128K favourites', model: '128K' },
+    { name: 'Target: Renegade', path: 'TAPs/Target Renegade (1988)(Imagine)(128K).tap', group: '128K favourites', model: '128K' },
+    { name: 'Head over Heels', path: 'TAPs/Head over Heels (1987)(Ocean)(48K-128K).tap', group: '128K favourites', model: '128K' },
+    { name: 'Cybernoid', path: 'TAPs/Cybernoid (1988)(Hewson)(128K).tap', group: '128K favourites', model: '128K' },
+    { name: 'Cybernoid II: The Revenge', path: 'TAPs/Cybernoid II (1988)(Hewson)(128K).tap', group: '128K favourites', model: '128K' },
+    { name: 'The NeverEnding Story (128K)', path: 'TAPs/The NeverEnding Story (1985)(Ocean)(128K).tap', group: 'Music pick', model: '128K' },
+    { name: 'Chuckie Egg', path: "TAPs/Chuckie Egg (1983)(A'n'F).tap", group: 'More classics' },
+    { name: 'Galaxians', path: 'TAPs/Galaxians (1982)(Artic Computing)(16K).tap', group: 'More classics' },
+    { name: 'Ikari Warriors', path: 'TAPs/Ikari Warriors (1988)(Elite Systems)(48K-128K).tap', group: 'More classics' },
+    { name: 'The Night Sky', path: 'TAPs/Night Sky, The (1983)(Bridge Software).tap', group: 'More classics' },
+    { name: 'Spy Hunter', path: 'TAPs/Spy Hunter (1985)(U.S. Gold)[cr Blood].tap', group: 'More classics' },
+    { name: 'Tetris', path: 'TAPs/tetris_release.tap', group: 'More classics' }
 ];
 const EMBEDDED_TAP_BASE64 = {};
 
@@ -322,9 +333,100 @@ let audioMuted = false;
 let audioUnavailable = false;
 let nextAudioTime = 0;
 const AUDIO_SAMPLE_RATE = 44100;
-const T_STATES_PER_FRAME = 70000;
+function getFrameTStates() { return machineModel === '128K' ? 70908 : 69888; }
 let speakerLog = [];
 let lastSpeakerState = 0;
+let ayLog = [];
+let ayRegister = 0;
+const AY_REGISTER_MASKS = [255, 15, 255, 15, 255, 15, 31, 255, 31, 31, 31, 255, 255, 15, 255];
+const ayRegisters = new Uint8Array(15);
+
+// AY-3-8912: three tone channels, a shared 17-bit noise generator and envelope.
+// Its clock is half the 128K CPU clock; the tone counters tick at clock / 8.
+class AY38912 {
+    constructor() { this.reset(); }
+    reset() {
+        this.registers = new Uint8Array(15);
+        this.toneCounters = [0, 0, 0];
+        this.tonePeriods = [1, 1, 1];
+        this.toneBits = [1, 1, 1];
+        this.noiseCounter = 0;
+        this.noisePeriod = 2;
+        this.noise = 0x1FFFF;
+        this.envelopeCounter = 0;
+        this.envelopePeriod = 2;
+        this.envelopeStep = 15;
+        this.attack = 0;
+        this.holding = true;
+        this.fraction = 0;
+    }
+    write(register, value) {
+        this.registers[register] = value & AY_REGISTER_MASKS[register];
+        const r = this.registers;
+        if (register < 6) {
+            const channel = register >> 1;
+            this.tonePeriods[channel] = (r[channel * 2] | (r[channel * 2 + 1] << 8)) || 1;
+        }
+        if (register === 6) this.noisePeriod = (r[6] || 1) * 2;
+        if (register === 11 || register === 12) this.envelopePeriod = ((r[11] | (r[12] << 8)) || 1) * 2;
+        if (register === 13) {
+            this.envelopeCounter = 0;
+            this.envelopeStep = 15;
+            this.attack = (value & 4) ? 15 : 0;
+            this.holding = false;
+        }
+    }
+    tick() {
+        const r = this.registers;
+        for (let channel = 0; channel < 3; channel++) {
+            if (++this.toneCounters[channel] >= this.tonePeriods[channel]) {
+                this.toneCounters[channel] = 0;
+                this.toneBits[channel] ^= 1;
+            }
+        }
+        if (++this.noiseCounter >= this.noisePeriod) {
+            this.noiseCounter = 0;
+            const feedback = (this.noise ^ (this.noise >> 3)) & 1;
+            this.noise = (this.noise >> 1) | (feedback << 16);
+        }
+        if (!this.holding && ++this.envelopeCounter >= this.envelopePeriod) {
+            this.envelopeCounter = 0;
+            if (--this.envelopeStep < 0) {
+                const shape = r[13];
+                if (!(shape & 8)) {
+                    this.envelopeStep = 0;
+                    this.attack = 0;
+                    this.holding = true;
+                } else if (shape & 1) {
+                    if (shape & 2) this.attack ^= 15;
+                    this.envelopeStep = 0;
+                    this.holding = true;
+                } else {
+                    if (shape & 2) this.attack ^= 15;
+                    this.envelopeStep = 15;
+                }
+            }
+        }
+    }
+    sample(tStates) {
+        this.fraction += tStates / 16;
+        while (this.fraction >= 1) { this.tick(); this.fraction--; }
+        let output = 0;
+        const r = this.registers;
+        for (let channel = 0; channel < 3; channel++) {
+            const tone = (r[7] & (1 << channel)) || this.toneBits[channel];
+            const noise = (r[7] & (8 << channel)) || (this.noise & 1);
+            const volume = r[8 + channel];
+            const level = (volume & 16) ? (this.envelopeStep ^ this.attack) : volume;
+            output += tone && noise ? AY_LEVELS[level] : 0;
+        }
+        return output / 3;
+    }
+}
+// Logarithmic DAC levels, normalized to leave headroom for the beeper.
+const AY_LEVELS = [0, 0.00999, 0.01445, 0.02106, 0.03070, 0.04555, 0.06450, 0.10736,
+    0.12659, 0.20499, 0.29221, 0.37284, 0.49253, 0.63532, 0.80558, 1];
+const ayChip = new AY38912();
 
 function enableAudio() {
     if (!audioCtx) {
@@ -365,33 +467,58 @@ function updateAudioButton() {
 }
 
 function toggleAudioMute() {
+    enableAudio();
     audioMuted = !audioMuted;
     if (audioGain && audioCtx) {
         audioGain.gain.setTargetAtTime(audioMuted ? 0 : 0.10, audioCtx.currentTime, 0.015);
     }
     updateAudioButton();
+    if (z80) container.focus();
 }
 
-function processAudioFrame(log) {
-    if (!audioCtx) return;
-
-    // Buffer size = 1 frame @ 50Hz = 0.02s
+function synthesizeAudioFrame(log, ayEvents = ayLog) {
     const sampleCount = Math.floor(AUDIO_SAMPLE_RATE / 50);
-    const buffer = audioCtx.createBuffer(1, sampleCount, AUDIO_SAMPLE_RATE);
-    const data = buffer.getChannelData(0);
-
+    const data = new Float32Array(sampleCount);
     let logIdx = 0;
+    let ayIdx = 0;
     let currentSpeaker = lastSpeakerState;
-
+    const frameLength = getFrameTStates();
     for (let i = 0; i < sampleCount; i++) {
-        const currentT = (i / sampleCount) * T_STATES_PER_FRAME;
+        const currentT = ((i + 1) / sampleCount) * frameLength;
         while (logIdx < log.length && log[logIdx].t <= currentT) {
             currentSpeaker = log[logIdx].val;
             logIdx++;
         }
-        data[i] = currentSpeaker ? 0.5 : -0.5;
+        // Advance to each write before applying it, retaining sub-frame timing.
+        const startT = (i / sampleCount) * frameLength;
+        let ayTime = startT;
+        let ayOutput = 0;
+        if (machineModel === '128K') {
+            while (ayIdx < ayEvents.length && ayEvents[ayIdx].t <= currentT) {
+                const event = ayEvents[ayIdx++];
+                ayChip.sample(Math.max(0, event.t - ayTime));
+                ayChip.write(event.register, event.value);
+                ayTime = Math.max(ayTime, event.t);
+            }
+            ayOutput = ayChip.sample(Math.max(0, currentT - ayTime));
+        }
+        data[i] = (currentSpeaker ? 0.5 : -0.5) + ayOutput * 0.5;
     }
+    // Writes in an instruction crossing the frame boundary belong to its end.
+    while (ayIdx < ayEvents.length) {
+        const event = ayEvents[ayIdx++];
+        ayChip.write(event.register, event.value);
+    }
+    if (log.length) currentSpeaker = log[log.length - 1].val;
     lastSpeakerState = currentSpeaker;
+    return data;
+}
+
+function processAudioFrame(log) {
+    const data = synthesizeAudioFrame(log);
+    if (!audioCtx || audioCtx.state !== 'running') return;
+    const buffer = audioCtx.createBuffer(1, data.length, AUDIO_SAMPLE_RATE);
+    buffer.getChannelData(0).set(data);
 
     const source = audioCtx.createBufferSource();
     source.buffer = buffer;
@@ -441,7 +568,7 @@ function updateModelSelection() {
     document.getElementById('screenIdle').hidden = !!z80;
     document.getElementById('runState').textContent = z80 ? `${machineModel} / RUNNING` : 'DISPLAY / STANDBY';
     document.getElementById('tapeLoadHint').innerHTML = machineModel === '128K'
-        ? 'Insert a tape, choose <b>48 BASIC</b> in the Spectrum menu, then type <code>LOAD &quot;&quot;</code> and press Enter.'
+        ? 'Insert a tape, then select <b>Tape Loader</b> in the Spectrum menu and press Enter.'
         : 'Load or drop a tape here, then type <code>LOAD &quot;&quot;</code> and press Enter.';
     document.getElementById('sample128Hint').hidden = machineModel !== '128K';
 }
@@ -594,6 +721,33 @@ function readKeyboardPort(port) {
         if ((rowSelect & (~row & 0xFF)) === 0) result &= keyboard[rowAddress];
     }
     return result | 0xA0;
+}
+
+function readPort(port) {
+    if (machineModel === '128K' && (port & 0xC002) === 0xC000) {
+        // The serial/keypad socket is disconnected, so its input pins stay high.
+        if (ayRegister === 14) return (ayRegisters[7] & 0x40) ? ayRegisters[14] : 0xFF;
+        return ayRegister < 15 ? ayRegisters[ayRegister] : 0xFF;
+    }
+    // An absent Kempston joystick must report no pressed directions/buttons.
+    if ((port & 0x00FF) === 0x1F) return 0;
+    return readKeyboardPort(port);
+}
+
+function writePort(port, val) {
+    if (machineModel === '128K') {
+        if ((port & 0xC002) === 0xC000) ayRegister = val & 15;
+        if ((port & 0xC002) === 0x8000 && ayRegister < 15) {
+            const value = val & AY_REGISTER_MASKS[ayRegister];
+            ayRegisters[ayRegister] = value;
+            ayLog.push({ t: frameTStates, register: ayRegister, value });
+        }
+        if ((port & 0xC002) === 0x4000 && (port & 0x00FF) === 0x00FD) page128KMemory(val);
+    }
+    if ((port & 1) === 0) {
+        speakerLog.push({ t: frameTStates, val: (val >> 4) & 1 });
+        monitor.style.borderColor = PALETTE_HEX[val & 7];
+    }
 }
 
 async function extractRomFilesFromZip(file) {
@@ -768,16 +922,18 @@ function setTapeBuffer(arrayBuffer, sourceLabel = 'Tape') {
     document.getElementById('tapeName').textContent = sourceLabel;
     document.getElementById('tapeName').title = sourceLabel;
     document.getElementById('tapeDeck').classList.add('has-tape');
-    const loadHint = machineModel === '128K' ? 'Use 48 BASIC, then type LOAD "" and press Enter.' : 'Type LOAD "" and press Enter.';
+    const loadHint = machineModel === '128K' ? 'Select Tape Loader in the Spectrum menu and press Enter.' : 'Type LOAD "" and press Enter.';
     log(`${sourceLabel} loaded. ${loadHint}`, 'success');
 }
 
 function getSampleCatalog() {
     const embeddedPaths = Object.keys(EMBEDDED_TAP_BASE64);
     if (embeddedPaths.length > 0) {
-        return embeddedPaths
+        const knownPaths = new Set(DEFAULT_SAMPLE_TAPS.map((sample) => sample.path));
+        return DEFAULT_SAMPLE_TAPS.filter((sample) => embeddedPaths.includes(sample.path)).concat(embeddedPaths
+            .filter((path) => !knownPaths.has(path))
             .sort((a, b) => a.localeCompare(b))
-            .map((path) => ({ name: path.split('/').pop(), path }));
+            .map((path) => ({ name: path.split('/').pop(), path, group: 'More classics' })));
     }
     return DEFAULT_SAMPLE_TAPS;
 }
@@ -788,15 +944,21 @@ function encodeSamplePath(path) {
 
 async function loadSampleTap(sample) {
     try {
+        let arrayBuffer;
         if (EMBEDDED_TAP_BASE64[sample.path]) {
             const bytes = decodeBase64ToBytes(EMBEDDED_TAP_BASE64[sample.path]);
-            setTapeBuffer(bytes.buffer, `Sample "${sample.name}"`);
-            return true;
+            arrayBuffer = bytes.buffer;
+        } else {
+            const response = await fetch(encodeSamplePath(sample.path));
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            arrayBuffer = await response.arrayBuffer();
         }
 
-        const response = await fetch(encodeSamplePath(sample.path));
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        setTapeBuffer(await response.arrayBuffer(), `Sample "${sample.name}"`);
+        if (sample.model === '128K' && machineModel !== '128K') {
+            await loadBuiltInModel('128K');
+            if (machineModel !== '128K' || !z80 || !isRunning) throw new Error('Could not start the 128K model.');
+        }
+        setTapeBuffer(arrayBuffer, `Sample "${sample.name}"`);
         return true;
     } catch (err) {
         log(`Failed to load sample: ${err.message}`, 'error');
@@ -823,11 +985,19 @@ function renderSamplesMenu() {
     placeholderOption.textContent = 'Choose a sample...';
     sampleSelect.appendChild(placeholderOption);
 
+    const groups = new Map();
     for (const sample of sampleCatalog) {
+        const label = sample.group || 'More classics';
+        if (!groups.has(label)) {
+            const group = document.createElement('optgroup');
+            group.label = label;
+            groups.set(label, group);
+            sampleSelect.appendChild(group);
+        }
         const option = document.createElement('option');
         option.value = sample.path;
         option.textContent = sample.name;
-        sampleSelect.appendChild(option);
+        groups.get(label).appendChild(option);
     }
 
     sampleSelect.value = '';
@@ -880,18 +1050,8 @@ function initZ80() {
     z80 = new Z80_CPU({
         mem_read: readMemory,
         mem_write: writeMemory,
-        io_read: readKeyboardPort,
-        io_write: (port, val) => {
-            if (machineModel === '128K' && (port & 0xC002) === 0x4000 && (port & 0x00FF) === 0x00FD) {
-                page128KMemory(val);
-            }
-            if ((port & 0x1) === 0) {
-                const speaker = (val & 0x10) ? 1 : 0;
-                speakerLog.push({ t: frameTStates, val: speaker });
-                const colorIdx = val & 7;
-                monitor.style.borderColor = PALETTE_HEX[colorIdx];
-            }
-        }
+        io_read: readPort,
+        io_write: writePort
     });
 
     log(`${machineModel} ROM${machineModel === '128K' ? 's' : ''} loaded.`, 'success');
@@ -909,12 +1069,20 @@ function resetSystem() {
     tapeIndex = 0;
     pagingLatch = 0;
     pagingLocked = false;
+    ayRegister = 0;
+    ayRegisters.fill(0);
+    ayChip.reset();
+    ayLog = [];
+    speakerLog = [];
+    lastSpeakerState = 0;
+    nextAudioTime = audioCtx ? audioCtx.currentTime : 0;
+    releaseAllKeys();
     isRunning = true;
     if(animationFrameId) cancelAnimationFrame(animationFrameId);
     container.focus();
     monitor.style.borderColor = '#333a36';
     loop();
-    log(machineModel === '128K' ? '128K ready. For tapes, choose 48 BASIC from the Spectrum menu.' : '48K ready. Load a tape or start typing.', 'normal');
+    log(machineModel === '128K' ? '128K ready. Insert a tape, then select Tape Loader from the Spectrum menu.' : '48K ready. Load a tape or start typing.', 'normal');
 }
 
 let frameTStates = 0;
@@ -926,17 +1094,22 @@ function loop() {
     // If we have audio enabled, we MUST NOT run faster than the audio hardware.
     // If the next audio chunk is scheduled > 40ms in the future, we are running too fast.
     // We skip this visual frame to let the audio "catch up".
-    if (audioCtx && (nextAudioTime - audioCtx.currentTime) > 0.04) {
+    if (audioCtx && audioCtx.state === 'running' && (nextAudioTime - audioCtx.currentTime) > 0.04) {
         animationFrameId = requestAnimationFrame(loop);
         return;
     }
 
     frameTStates = 0;
     speakerLog = [];
+    ayLog = [];
 
-    while (frameTStates < T_STATES_PER_FRAME) {
-        if (z80.getState().pc === 0x0556 && tapeBuffer && (machineModel === '48K' || ((pagingLatch >> 4) & 1) === 1)) {
+    while (frameTStates < getFrameTStates()) {
+        // Let LD-BYTES run its prologue, then trap the first tape read. Loaders
+        // such as Exolon's enter here directly with A/carry already in AF'.
+        // Keeping the ROM's stack setup also preserves its border/EI epilogue.
+        if (z80.getState().pc === 0x0562 && tapeBuffer && (machineModel === '48K' || ((pagingLatch >> 4) & 1) === 1)) {
             handleTapeLoad();
+            frameTStates += 10; // Account for the shortcut's RET.
             continue;
         }
         frameTStates += z80.run_instruction();
@@ -950,8 +1123,8 @@ function loop() {
 }
 
 function handleTapeLoad() {
-    let state = z80.getState();
-    let currentTapePos = tapeIndex;
+    const state = z80.getState();
+    const currentTapePos = tapeIndex;
 
     if (!tapeBuffer || currentTapePos >= tapeBuffer.byteLength) {
         log("Tape End.", 'error');
@@ -962,32 +1135,42 @@ function handleTapeLoad() {
     const view = new DataView(tapeBuffer);
     if (currentTapePos + 2 > tapeBuffer.byteLength) { returnFromTrap(state, false); return; }
     const blockLen = view.getUint16(currentTapePos, true);
-    if (currentTapePos + 2 + blockLen > tapeBuffer.byteLength) { returnFromTrap(state, false); return; }
+    if (blockLen < 2 || currentTapePos + 2 + blockLen > tapeBuffer.byteLength) { returnFromTrap(state, false); return; }
 
     const flagByte = view.getUint8(currentTapePos + 2);
-    let dataPtr = currentTapePos + 3;
-    let payloadLen = blockLen - 2;
-    if (payloadLen < 0) payloadLen = 0;
-
-    let destAddr = state.ix;
-    let reqLen = (state.d << 8) | state.e; // Fix undefined DE
-
-    const bytesToCopy = (payloadLen < reqLen) ? payloadLen : reqLen;
-    for (let i = 0; i < bytesToCopy; i++) {
-        writeMemory((destAddr + i) & 0xFFFF, view.getUint8(dataPtr + i));
-    }
-
-    state.ix += bytesToCopy;
-    let newDE = reqLen - bytesToCopy;
-    if(newDE < 0) newDE = 0;
-    state.d = (newDE >> 8) & 0xFF;
-    state.e = newDE & 0xFF;
-    state.a = flagByte;
-
+    const dataPtr = currentTapePos + 3;
+    const payloadLen = blockLen - 2;
     tapeIndex += blockLen + 2;
 
-    returnFromTrap(state, true);
-    log("Block Loaded.", 'success');
+    // At 0562 the ROM has exchanged AF with AF': the expected flag and
+    // LOAD (carry set) / VERIFY (carry clear) request live in the alternate set.
+    if (flagByte !== state.a_prime) {
+        returnFromTrap(state, false);
+        return;
+    }
+
+    const reqLen = (state.d << 8) | state.e;
+    const bytesToCopy = Math.min(payloadLen, reqLen);
+    let checksum = flagByte;
+    let transferred = 0;
+    for (; transferred < bytesToCopy; transferred++) {
+        const value = view.getUint8(dataPtr + transferred);
+        const addr = (state.ix + transferred) & 0xFFFF;
+        checksum ^= value;
+        if (state.flags_prime.C) writeMemory(addr, value);
+        else if (readMemory(addr) !== value) break;
+    }
+
+    state.ix = (state.ix + transferred) & 0xFFFF;
+    const remaining = reqLen - transferred;
+    state.d = (remaining >> 8) & 0xFF;
+    state.e = remaining & 0xFF;
+    // The next byte after the requested data is the ROM's parity byte.
+    checksum ^= view.getUint8(dataPtr + bytesToCopy);
+    state.a = state.h = checksum;
+    const success = remaining === 0 && checksum === 0;
+    returnFromTrap(state, success);
+    log(success ? 'Block Loaded.' : 'Tape loading error.', success ? 'success' : 'error');
 }
 
 function returnFromTrap(state, success) {

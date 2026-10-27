@@ -22,11 +22,20 @@ After the emulator opens:
    the tape deck), then type `LOAD ""` and press Enter. **Sample games** opens
    the bundled tape library. On 48K, press **J** for LOAD, then **Shift + P**
    twice for the quotes.
-   On 128K, choose **48 BASIC** from the Spectrum menu before loading a tape.
+   On 128K, insert the tape, select **Tape Loader** from the Spectrum menu,
+   and press Enter. You can also load tapes with `LOAD ""` from BASIC.
 
 The app is a single, self-contained HTML file. The emulator code, both models'
 ROMs, model images, keyboard map, and sample tapes are embedded in it; no installation,
 server, or additional files are needed to run it.
+
+**Sample games** includes EXOLON, RoboCop, Target: Renegade, Head over Heels,
+Cybernoid, and Cybernoid II in the **128K favourites** group. **The NeverEnding
+Story (128K)** is a separate music pick. The original sample games are also kept.
+These 128K picks select the 128K model when needed; reset before loading a
+different game, and press Space if its title screen pauses.
+The NeverEnding Story continues automatically from its loading picture to the
+credits and theme music; press Space on the credits to enter the adventure.
 
 ## Keyboard
 
@@ -50,4 +59,10 @@ server, or additional files are needed to run it.
 To rebuild the app on Windows, run `developer\build_single_html.ps1` in
 PowerShell. It writes the updated standalone `index.html`.
 
-The 128K AY sound chip and the native 128K tape loader are not emulated.
+Run regression checks with `node --test`. The bundled EXOLON tape is used for
+loading, music, keyboard, and screen-transition checks; set `EXOLON_TAP` to test
+a different local copy.
+
+The 128K model includes AY-3-8912 music and sound effects (tone, noise, and
+envelope), mixed with the beeper. TAP loading supports the ROM's standard and
+alternate loading entry points, including the 128K Tape Loader.
