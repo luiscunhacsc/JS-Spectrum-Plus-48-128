@@ -100,13 +100,20 @@ test('AY writes retain their timing within the Web Audio output buffer', async (
         writePort(0xFFFD, 8); writePort(0xBFFD, 0);
         processAudioFrame([]);
         const data = audioCtx.lastBuffer.getChannelData(0);
+        // Muting at sample 440 removes chip transitions immediately. The DC
+        // blocker still has a smooth release tail, rather than instant silence.
+        const r = Math.exp(-2 * Math.PI * 20 / 44100);
+        const innovations = Array.from(data, (v, i) => i ? v - r * data[i - 1] : v);
         return { length: data.length, firstRange: Math.max(...data.slice(0,440)) - Math.min(...data.slice(0,440)),
-            secondRange: Math.max(...data.slice(442)) - Math.min(...data.slice(442)),
+            muteEdge: innovations[440], beforeMute: innovations[439],
+            tailError: Math.max(...innovations.slice(441).map(Math.abs)),
             starts: audioCtx.starts.length };
     })()`);
     assert.equal(result.length, 882);
     assert.ok(result.firstRange > 0.1);
-    assert.equal(result.secondRange, 0);
+    assert.ok(Math.abs(result.beforeMute) < 1e-7);
+    assert.ok(Math.abs(result.muteEdge + 1 / 6) < 1e-7);
+    assert.ok(result.tailError < 1e-7);
     assert.ok(result.starts >= 2);
 });
 
